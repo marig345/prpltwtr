@@ -762,6 +762,23 @@ static void _twitter_search_timeout_context_destory (TwitterSearchTimeoutContext
 } 
 
 
+static void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *message, time_t time)
+{
+	if (!purple_conv_chat_find_user(chat, who))
+	{
+		purple_conv_chat_add_user(chat,
+				who,
+				NULL,   /* user-provided join message, IRC style */
+				PURPLE_CBFLAGS_NONE,
+				FALSE);  /* show a join message */
+	}
+	serv_got_chat_in(purple_conversation_get_gc(purple_conv_chat_get_conversation(chat)),
+			purple_conv_chat_get_id(chat),
+			who,
+			PURPLE_MESSAGE_RECV,
+			message,
+			time);
+}
 static void twitter_search_cb2(PurpleAccount *account,
 		const GArray *search_results,
 		const gchar *refresh_url,
@@ -802,16 +819,7 @@ static void twitter_search_cb2(PurpleAccount *account,
 			tweet = g_strdup(search_data->text);
 		}
 
-		if (!purple_conv_chat_find_user(chat, search_data->from_user))
-		{
-			purple_conv_chat_add_user(chat,
-					search_data->from_user,
-					NULL,   /* user-provided join message, IRC style */
-					PURPLE_CBFLAGS_NONE,
-					FALSE);  /* show a join message */
-		}
-		serv_got_chat_in(gc, chat_id, search_data->from_user, PURPLE_MESSAGE_RECV, tweet,
-				time(NULL));
+		twitter_chat_add_tweet(chat, search_data->from_user, tweet, time(NULL));//TODO: FIX TIME
 
 		g_free (tweet);
 	}
@@ -1102,6 +1110,52 @@ static void twitter_chat_leave(PurpleConnection *gc, int id) {
 	//TODO: free up resources?
 
 }
+static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
+		PurpleMessageFlags flags) {
+	PurpleConversation *conv = purple_find_chat(gc, id);
+	const char *chat_name = NULL;
+	char *status;
+	char *message_lower, *chat_name_lower;
+
+	if (conv == NULL) return -1; //TODO: error?
+	chat_name = conv->name;
+
+	if (chat_name == NULL) return -1; //TODO: error?
+
+	//TODO: check if keyword is already in message
+
+	//TODO: verify that we want utf8 case insensitive, and not ascii
+	message_lower = g_utf8_strup(message, -1);
+	chat_name_lower = g_utf8_strup(chat_name, -1);
+	if (strstr(message_lower, chat_name_lower))
+	{
+		status = g_strdup(message);
+	} else {
+		status = g_strdup_printf("%s %s", chat_name, message);
+	}
+	g_free(message_lower);
+	g_free(chat_name_lower);
+
+	if (strlen(status) > MAX_TWEET_LENGTH)
+	{
+		//TODO: TEST ME!
+		purple_conv_present_error(chat_name, purple_connection_get_account(gc), "Message is too long");
+		g_free(status);
+		return -1;
+	}
+	else
+	{
+		PurpleAccount *account = purple_connection_get_account(gc);
+		twitter_api_set_status(purple_connection_get_account(gc),
+				status, 0,
+				NULL, NULL,//TODO: verify & error
+				NULL);
+		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, status, time(NULL));//TODO: FIX TIME
+		g_free(status);
+		return 0;
+	}
+}
+
 static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 	const char *search = g_hash_table_lookup(components, "search");
 	const char *interval_str = g_hash_table_lookup(components, "interval");
@@ -1927,7 +1981,7 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL,		/* chat_invite */
 	twitter_chat_leave,		 /* chat_leave */
 	NULL,//twitter_chat_whisper,	       /* chat_whisper */
-	NULL,		  /* chat_send */
+	twitter_chat_send,		  /* chat_send */
 	NULL,//TODO?				/* keepalive */
 	NULL,	      /* register_user */
 	twitter_get_cb_info,		/* get_cb_info */
