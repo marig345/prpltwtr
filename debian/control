@@ -2,13 +2,13 @@ Source: libpurple-twitter-protocol
 Priority: optional
 Section: user/network
 Maintainer: Tan Miaoqing <rabbitrun84@gmail.com>
-Build-Depends: debhelper (>= 5), cdbs, pkg-config, libpurple-dev, pidgin-dev, libjson-glib-dev
+Build-Depends: debhelper (>= 5), cdbs, pkg-config, libpurple-dev, pidgin-dev
 Standards-Version: 3.8.0
 
 Package: libpurple-twitter-protocol
 Section: user/network
 Architecture: any
-Depends: libpurple0, libjson-glib-1.0-0, account-plugin-haze, ${shlibs:Depends}, ${misc:Depends}
+Depends: libpurple0, account-plugin-haze, ${shlibs:Depends}, ${misc:Depends}
 Description: This plugin tightly integrates Twitter to Maemo Contacts and Conversations
  It imports your Twitter friends and saved search queries to Contacts, and receives 
  mentions/replies, DMs and Twitter search results as conversation threads. In addition, 

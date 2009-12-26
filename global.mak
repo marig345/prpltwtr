@@ -84,7 +84,6 @@ PURPLE_LIBS = $(shell pkg-config --libs purple)
 PURPLE_CFLAGS = $(CFLAGS) -DPURPLE_PLUGINS -DENABLE_NLS -DMBPURPLE_VERSION=\"$(VERSION)\"
 PURPLE_CFLAGS += $(shell pkg-config --cflags purple)
 PURPLE_CFLAGS += $(shell pkg-config --cflags pidgin)
-PURPLE_CFLAGS += $(shell pkg-config --cflags json-glib-1.0)
 PURPLE_CFLAGS += -Wall -pthread -I. -g -O2 -pipe -fPIC -DPIC 
 PLUGIN_SUFFIX := .so
 EXE_SUFFIX := 
@@ -93,7 +92,6 @@ PURPLE_PROTOCOL_PIXMAP_DIR := $(DESTDIR)$(PREFIX)/share/pixmaps/pidgin/protocols
 PURPLE_PLUGIN_DIR := $(DESTDIR)$(LIBDIR)/purple-2
 
 PIDGIN_LIBS = $(shell pkg-config --libs $(PIDGIN_NAME))
-PIDGIN_LIBS += $(shell pkg-config --libs json-glib-1.0)
 PIDGIN_CFLAGS = $(CFLAGS) -DPIDGIN_PLUGINS -DENABLE_NLS -DMBPURPLE_VERSION=\"$(VERSION)\"
 PIDGIN_CFLAGS += $(shell pkg-config --cflags $(PIDGIN_NAME))
 PIDGIN_CFLAGS += -Wall -pthread -I. -g -O2 -pipe -fPIC -DPIC 

@@ -159,7 +159,7 @@ void twitter_api_search (PurpleAccount *account,
         TwitterSearchErrorFunc error_func,
         gpointer data)
 {
-    /* http://search.twitter.com/search.json + query (e.g. ?q=n900) */
+    /* http://search.twitter.com/search.atom + query (e.g. ?q=n900) */
     char *query = since_id ?
             g_strdup_printf ("?q=%s&rpp=%u&since_id=%lld", keyword, rpp, since_id) :
             g_strdup_printf ("?q=%s&rpp=%u", keyword, rpp);
