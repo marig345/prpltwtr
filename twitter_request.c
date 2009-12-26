@@ -39,6 +39,8 @@
 #include "twitter_request.h"
 #include "twitter_util.h"
 
+#define USER_AGENT "Mozilla/4.0 (compatible; MSIE 5.5)"
+
 typedef struct {
 	PurpleAccount *account;
 	TwitterSendRequestSuccessFunc success_func;
@@ -167,22 +169,22 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 
 	request = g_strdup_printf(
 			"%s %s%s%s HTTP/1.0\r\n"
-			"User-Agent: Mozilla/4.0 (compatible; MSIE 5.5)\r\n"
+			"User-Agent: " USER_AGENT "\r\n"
 			"Host: %s\r\n"
 			"Authorization: Basic %s\r\n"
-			"Content-Length: %ld\r\n\r\n"
+			"Content-Length: %lu\r\n\r\n"
 			"%s",
 			post ? "POST" : "GET",
 			full_url,
 			(!post && query_string ? "?" : ""), (!post && query_string ? query_string : ""),
 			host,
 			auth_text_b64,
-			query_string  && post ? strlen(query_string) : 0,
+			query_string && post ? strlen(query_string) : 0,
 			query_string && post ? query_string : "");
 
 	g_free(auth_text_b64);
 	purple_util_fetch_url_request(full_url, TRUE,
-			"Mozilla/4.0 (compatible; MSIE 5.5)", TRUE, request, FALSE,
+			USER_AGENT, TRUE, request, FALSE,
 			twitter_send_request_cb, request_data);
 	g_free(full_url);
 	g_free(request);
