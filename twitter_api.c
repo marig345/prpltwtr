@@ -69,15 +69,15 @@ void twitter_api_get_friends(PurpleAccount *account,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
 		gpointer data)
 {
-    purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
 
-    twitter_send_request_with_cursor (account,
+	twitter_send_request_with_cursor (account,
 			"/statuses/friends.xml", NULL, -1,
 			success_func, error_func, data);
 }
 
 void twitter_api_get_replies(PurpleAccount *account,
-        long long since_id,
+		long long since_id,
 		int count,
 		int page,
 		TwitterSendRequestSuccessFunc success_func,
@@ -108,7 +108,7 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 		g_strdup_printf ("since_id=%lld&count=%d", since_id, count) :
 		g_strdup_printf ("count=%d", count);
 
-    purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
 
 	twitter_send_request_multipage_all(account,
 			"/statuses/mentions.xml", query,
@@ -127,9 +127,9 @@ void twitter_api_set_status(PurpleAccount *acct,
 	if (msg != NULL && strcmp("", msg))
 	{
 		char *query = in_reply_to_status_id ?
-		        g_strdup_printf ("status=%s&in_reply_to_status_id=%lld",
-		                purple_url_encode(msg), in_reply_to_status_id) :
-		        g_strdup_printf("status=%s", purple_url_encode(msg));
+			g_strdup_printf ("status=%s&in_reply_to_status_id=%lld",
+					purple_url_encode(msg), in_reply_to_status_id) :
+			g_strdup_printf("status=%s", purple_url_encode(msg));
 		twitter_send_request(acct, TRUE,
 				"/statuses/update.xml", query,
 				success_func, NULL, data);
@@ -139,40 +139,62 @@ void twitter_api_set_status(PurpleAccount *acct,
 	}
 }
 
-void twitter_api_get_saved_searches (PurpleAccount *account,
-        TwitterSendRequestSuccessFunc success_func,
-        TwitterSendRequestErrorFunc error_func,
-        gpointer data)
+void twitter_api_send_dm(PurpleAccount *acct,
+		const char *user,
+		const char *msg,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data)
 {
-    purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+	if (msg != NULL && strcmp("", msg) && user != NULL && strcmp("", user))
+	{
+		char *user_encoded = g_strdup(purple_url_encode(user));
+		char *query = g_strdup_printf ("text=%s&user=%s",
+				purple_url_encode(msg), user_encoded);
+		twitter_send_request(acct, TRUE,
+				"/direct_messages/new.xml", query,
+				success_func, NULL, data);
+		g_free(user_encoded);
+		g_free(query);
+	} else {
+		//SEND error?
+	}
+}
 
-    twitter_send_request (account, FALSE,
-            "/saved_searches.xml", NULL,
-            success_func, error_func, data);
+void twitter_api_get_saved_searches (PurpleAccount *account,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data)
+{
+	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+
+	twitter_send_request (account, FALSE,
+			"/saved_searches.xml", NULL,
+			success_func, error_func, data);
 }
 
 void twitter_api_search (PurpleAccount *account,
-        const char *keyword,
-        long long since_id,
-        uint rpp,
-        TwitterSearchSuccessFunc success_func,
-        TwitterSearchErrorFunc error_func,
-        gpointer data)
+		const char *keyword,
+		long long since_id,
+		uint rpp,
+		TwitterSearchSuccessFunc success_func,
+		TwitterSearchErrorFunc error_func,
+		gpointer data)
 {
-    /* http://search.twitter.com/search.atom + query (e.g. ?q=n900) */
-    char *query = since_id ?
-            g_strdup_printf ("?q=%s&rpp=%u&since_id=%lld", keyword, rpp, since_id) :
-            g_strdup_printf ("?q=%s&rpp=%u", keyword, rpp);
+	/* http://search.twitter.com/search.atom + query (e.g. ?q=n900) */
+	char *query = since_id ?
+		g_strdup_printf ("?q=%s&rpp=%u&since_id=%lld", keyword, rpp, since_id) :
+		g_strdup_printf ("?q=%s&rpp=%u", keyword, rpp);
 
-    twitter_search (account, query, success_func, error_func, data);
-    g_free (query);
+	twitter_search (account, query, success_func, error_func, data);
+	g_free (query);
 }
 
 void twitter_api_search_refresh (PurpleAccount *account,
-        const char *refresh_url,
-        TwitterSearchSuccessFunc success_func,
-        TwitterSearchErrorFunc error_func,
-        gpointer data)
+		const char *refresh_url,
+		TwitterSearchSuccessFunc success_func,
+		TwitterSearchErrorFunc error_func,
+		gpointer data)
 {
-    twitter_search (account, refresh_url, success_func, error_func, data);
+	twitter_search (account, refresh_url, success_func, error_func, data);
 }

@@ -23,6 +23,12 @@ void twitter_api_get_rate_limit_status(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data);
 
+void twitter_api_send_dm(PurpleAccount *acct,
+		const char *user,
+		const char *msg,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data);
 void twitter_api_set_status(PurpleAccount *acct,
 		const char *msg,
 		long long in_reply_to_status_id,
