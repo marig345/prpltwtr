@@ -170,7 +170,7 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 			"User-Agent: Mozilla/4.0 (compatible; MSIE 5.5)\r\n"
 			"Host: %s\r\n"
 			"Authorization: Basic %s\r\n"
-			"Content-Length: %d\r\n\r\n"
+			"Content-Length: %ld\r\n\r\n"
 			"%s",
 			post ? "POST" : "GET",
 			full_url,
