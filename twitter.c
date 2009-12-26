@@ -1290,37 +1290,6 @@ static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, 
 	twitter_verify_connection_error_handler(acct, error_data);
 }
 
-static long long get_stored_last_reply_id (const gchar *accont_username)
-{
-	gchar *file, *config_file;
-	long long reply_id = 0;
-
-	config_file = g_strdup_printf ("%s-%s", accont_username, CONFIG_FILE);
-	file = g_build_filename (
-			g_get_home_dir(),
-			CONFIG_DIR,
-			config_file,
-			NULL);
-	g_free (config_file);
-
-	if (g_file_test (file, G_FILE_TEST_EXISTS)) {
-		FILE *pFile = g_fopen (file, "r");
-
-		if (pFile) {
-			fscanf (pFile, "%lld", &reply_id);
-			purple_debug_info("twitter--",
-					"last reply id from config %lld\n", reply_id);
-
-			/* TODO sometimes reply_id could be 0?????
-			 * Reading failure???????????????? */
-
-			fclose (pFile);
-		}
-	}
-	g_free (file);
-
-	return reply_id;
-}
 
 static void twitter_verify_connection(PurpleAccount *acct)
 {
@@ -1337,10 +1306,8 @@ static void twitter_verify_connection(PurpleAccount *acct)
 
 	if (retrieve_history) {
 		PurpleConnection *gc = purple_account_get_connection(acct);
-		long long reply_id = get_stored_last_reply_id(acct->username);
 
 		if (purple_connection_get_state(gc) == PURPLE_CONNECTING) {
-			twitter_account_set_last_reply_id(acct, reply_id);
 
 			purple_connection_update_progress(gc, "Connecting...",
 					1,   /* which connection step this is */
@@ -1418,24 +1385,6 @@ static void twitter_close(PurpleConnection *gc)
 	if (twitter->search_table)
 		g_hash_table_destroy (twitter->search_table);
 	twitter->search_table = NULL;
-
-	/* Store the id of last retrieved reply,
-	 * so next time when we login, we can retrieve replies since this id */
-	if (twitter->last_reply_id) {
-		gchar *config_file = g_strdup_printf ("%s-%s",
-				gc->account->username, CONFIG_FILE);
-		gchar *file = g_build_filename (
-				g_get_home_dir(),
-				CONFIG_DIR,
-				config_file,
-				NULL);
-		g_free (config_file);
-
-		FILE *pFile = g_fopen (file, "w");
-		fprintf (pFile, "%lld\n", twitter->last_reply_id);
-		fclose (pFile);
-		g_free (file);
-	}
 
 	g_free(twitter);
 }
