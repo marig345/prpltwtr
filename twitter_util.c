@@ -17,7 +17,7 @@ gchar *get_search_keyword (const gchar *name)
         return NULL;
 
     words = g_strsplit (name, SEARCH_PREFIX, 2);
-    keyword = g_uri_escape_string (words[1], NULL, TRUE);
+    keyword = g_strdup(words[1]);
 
     g_strfreev (words);
     return keyword;
