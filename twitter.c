@@ -87,10 +87,6 @@ typedef struct
 	 * when @me sends a tweet to others */
 	GHashTable *user_reply_id_table;
 
-	/* key: gchar *src_user_name (e.g. #N900),
-	 * value: instance of SearchTimeoutContext */
-	GHashTable *search_table;
-
 	gboolean requesting;
 } TwitterConnectionData;
 
@@ -779,7 +775,7 @@ static void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const 
 			message,
 			time);
 }
-static void twitter_search_cb2(PurpleAccount *account,
+static void twitter_search_cb(PurpleAccount *account,
 		const GArray *search_results,
 		const gchar *refresh_url,
 		long long max_id,
@@ -829,57 +825,7 @@ static void twitter_search_cb2(PurpleAccount *account,
 	ctx->refresh_url = g_strdup (refresh_url);
 }
 
-static void twitter_search_cb (PurpleAccount *account,
-		const GArray *search_results,
-		const gchar *refresh_url,
-		long long max_id,
-		gpointer user_data)
-{
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *)user_data;
-	PurpleConnection *gc = purple_account_get_connection(account);
-	gint i, len = search_results->len;
-	gboolean add_link;
-
-	g_return_if_fail (ctx != NULL);
-
-	add_link = purple_account_get_bool (account,
-			TWITTER_PREF_ADD_URL_TO_TWEET,
-			TWITTER_PREF_ADD_URL_TO_TWEET_DEFAULT);
-
-	for (i = len-1; i >= 0; i--) {
-		TwitterSearchData *search_data;
-		gchar *tweet;
-
-		search_data = g_array_index (search_results,
-				TwitterSearchData *, i);
-
-		if (add_link) {
-			tweet = g_strdup_printf (
-					"%s: %s\nhttp://twitter.com/%s/status/%lld\n",
-					search_data->from_user,
-					search_data->text,
-					search_data->from_user,
-					search_data->id);
-		}
-		else {
-			tweet = g_strdup_printf (
-					"%s: %s",
-					search_data->from_user,
-					search_data->text);
-		}
-
-		serv_got_im (gc, ctx->src_user_name,
-				tweet, PURPLE_MESSAGE_RECV, time(NULL));
-
-		g_free (tweet);
-	}
-
-	ctx->last_tweet_id = max_id;
-	g_free (ctx->refresh_url);
-	ctx->refresh_url = g_strdup (refresh_url);
-}
-
-static gboolean twitter_search_timeout2(gpointer data)
+static gboolean twitter_search_timeout(gpointer data)
 {
 	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *)data;
 
@@ -888,34 +834,6 @@ static gboolean twitter_search_timeout2(gpointer data)
 				G_STRFUNC, ctx->refresh_url);
 
 		twitter_api_search_refresh(ctx->account, ctx->refresh_url,
-				twitter_search_cb2, NULL, ctx);
-	}
-	else {
-		gchar *refresh_url;
-
-		refresh_url = g_strdup_printf ("?q=%s&since_id=%lld",
-				purple_url_encode(ctx->keyword), ctx->last_tweet_id);
-
-		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, create refresh_url: %s\n",
-				G_STRFUNC, refresh_url);
-
-		twitter_api_search_refresh (ctx->account, refresh_url,
-				twitter_search_cb2, NULL, ctx);
-
-		g_free (refresh_url);
-	}
-
-	return TRUE;
-}
-static gboolean twitter_search_timeout (gpointer data)
-{
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *)data;
-
-	if (ctx->refresh_url) {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, refresh_url exists: %s\n",
-				G_STRFUNC, ctx->refresh_url);
-
-		twitter_api_search_refresh (ctx->account, ctx->refresh_url,
 				twitter_search_cb, NULL, ctx);
 	}
 	else {
@@ -934,34 +852,6 @@ static gboolean twitter_search_timeout (gpointer data)
 	}
 
 	return TRUE;
-}
-
-static void deleting_conversation_cb (PurpleConversation *conv,
-		PurpleAccount *account)
-{
-	PurpleConnection *gc = purple_conversation_get_gc (conv);
-	TwitterConnectionData *twitter = gc->proto_data;
-	gchar *keyword; /* search keyword */
-
-	/* the name of the PurpleBuddy */
-	const char *name = purple_conversation_get_name (conv);
-	keyword = get_search_keyword (name);
-	if (keyword) {
-		/* Get the TwitterSearchTimeoutContext for src_user_name
-		 * Remove the timer for the corresponding search keyword */
-		TwitterSearchTimeoutContext *ctx;
-
-		purple_debug_info(TWITTER_PROTOCOL_ID, "delete conv: name %s\n", name);
-
-		ctx = g_hash_table_lookup (twitter->search_table, name);
-
-		if (ctx && ctx->timer_handle) {
-			purple_timeout_remove (ctx->timer_handle);
-			ctx->timer_handle = 0;
-		}
-
-		g_free (keyword);
-	}
 }
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
@@ -974,61 +864,14 @@ static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAcc
 	return ctx;
 }
 
-static void conversation_created_cb (PurpleConversation *conv,
-		PurpleAccount *account)
-{
-	PurpleConnection *gc = purple_conversation_get_gc (conv);
-	TwitterConnectionData *twitter = gc->proto_data;
-	gchar *keyword; /* search keyword */
-
-	/* the name of the PurpleBuddy */
-	const char *name = purple_conversation_get_name (conv);
-
-	keyword = get_search_keyword (name);
-	if (keyword) {
-		TwitterSearchTimeoutContext *ctx;
-
-		purple_debug_info(TWITTER_PROTOCOL_ID,
-				"%s: create a search query for %s\n",
-				G_STRFUNC, keyword);
-
-		ctx = g_hash_table_lookup (twitter->search_table, name);
-		if (ctx) {
-			purple_debug_info(TWITTER_PROTOCOL_ID, "TwitterSearchTimeoutContext exists\n");
-
-			if (ctx->timer_handle)
-				purple_timeout_remove (ctx->timer_handle);
-		}
-		else {
-			purple_debug_info(TWITTER_PROTOCOL_ID, "create new TwitterSearchTimeoutContext\n");
-
-			ctx = twitter_search_timeout_context_new(account, name, keyword);
-
-			g_hash_table_insert (twitter->search_table,
-					g_strdup (name), ctx);
-		}
-
-		/* First search (after opening the chat window) retrieves
-		 * more results than refresh (15?) */
-		twitter_api_search (account,
-				keyword, ctx->last_tweet_id,
-				TWITTER_SEARCH_RPP_DEFAULT,
-				twitter_search_cb, NULL, ctx);
-
-		ctx->timer_handle = purple_timeout_add_seconds (
-				60 * purple_account_get_int (account, TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT),
-				twitter_search_timeout, ctx);
-
-		g_free (keyword);
-	}
-}
-
 static void get_saved_searches_cb (PurpleAccount *account,
 		xmlnode *node,
 		gpointer user_data)
 {
 	xmlnode *search;
 
+	//TODO XXX: fix this to work with chat rooms?
+	return;
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 	for (search = node->child; search; search = search->next) {
@@ -1093,21 +936,20 @@ GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_na
 
 static void twitter_chat_leave(PurpleConnection *gc, int id) {
 	PurpleConversation *conv = purple_find_chat(gc, id);
-	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterSearchTimeoutContext *ctx;
 
 	g_return_if_fail(conv != NULL);
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "delete chat: name %s\n", conv->name);
 
-	ctx = g_hash_table_lookup (twitter->search_table, conv->name);
+	ctx = (TwitterSearchTimeoutContext *) purple_conversation_get_data(conv, "twitter-chat-context");
 	g_return_if_fail(ctx != NULL);
 
-	if (ctx && ctx->timer_handle) {
+	if (ctx->timer_handle) {
 		purple_timeout_remove (ctx->timer_handle);
 		ctx->timer_handle = 0;
 	}
-	//TODO: free up resources?
+	_twitter_search_timeout_context_destory(ctx);
 
 }
 static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
@@ -1175,16 +1017,18 @@ static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 			PurpleAccount *account = purple_connection_get_account(gc);
 			TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
 					search, search);
+			PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, search);
+			purple_conversation_set_data(conv, "twitter-chat-context", ctx);
+
 			twitter_api_search(account,
 					search, ctx->last_tweet_id,
 					TWITTER_SEARCH_RPP_DEFAULT,
-					twitter_search_cb2, NULL, ctx);
+					twitter_search_cb, NULL, ctx);
 
-			serv_got_joined_chat(gc, chat_id, search);
 
 			ctx->timer_handle = purple_timeout_add_seconds(
 					60 * interval,
-					twitter_search_timeout2, ctx);
+					twitter_search_timeout, ctx);
 	} else {
 		char *tmp = g_strdup_printf("Search %s is already open.", search);
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Search %s is already open.", search);
@@ -1208,14 +1052,6 @@ static void twitter_get_friends_verify_connection_cb(PurpleAccount *account,
 				2,   /* which connection step this is */
 				3);  /* total number of steps */
 		purple_connection_set_state(gc, PURPLE_CONNECTED);
-
-		purple_signal_connect (purple_conversations_get_handle(),
-				"conversation-created", twitter,
-				PURPLE_CALLBACK(conversation_created_cb), account);
-
-		purple_signal_connect (purple_conversations_get_handle(),
-				"deleting-conversation", twitter,
-				PURPLE_CALLBACK(deleting_conversation_cb), account);
 
 		l_users_data = twitter_users_nodes_parse(nodes);
 
@@ -1595,10 +1431,6 @@ static void twitter_login(PurpleAccount *acct)
 	twitter->user_reply_id_table = g_hash_table_new_full (
 			g_str_hash, g_str_equal, g_free, g_free);
 
-	twitter->search_table = g_hash_table_new_full (
-			g_str_hash, g_str_equal, g_free,
-			(GDestroyNotify)_twitter_search_timeout_context_destory);
-
 	/* purple wants a minimum of 2 steps */
 	purple_connection_update_progress(gc, ("Connecting"),
 			0,   /* which connection step this is */
@@ -1634,10 +1466,6 @@ static void twitter_close(PurpleConnection *gc)
 	if (twitter->user_reply_id_table)
 		g_hash_table_destroy (twitter->user_reply_id_table);
 	twitter->user_reply_id_table = NULL;
-
-	if (twitter->search_table)
-		g_hash_table_destroy (twitter->search_table);
-	twitter->search_table = NULL;
 
 	g_free(twitter);
 }
