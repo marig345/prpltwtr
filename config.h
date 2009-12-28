@@ -39,7 +39,3 @@
 
 #define TWITTER_INITIAL_REPLIES_COUNT 150
 #define TWITTER_EVERY_REPLIES_COUNT 40
-
-/* Store the ID of last retrieved reply */
-#define CONFIG_DIR ".libpurple-twitter-protocol"
-#define CONFIG_FILE "config"

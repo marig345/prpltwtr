@@ -1414,7 +1414,6 @@ static void twitter_login(PurpleAccount *acct)
 	PurpleConnection *gc = purple_account_get_connection(acct);
 	TwitterConnectionData *twitter = g_new0(TwitterConnectionData, 1);
 	gc->proto_data = twitter;
-	gchar *dir;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "logging in %s\n", acct->username);
 
@@ -1427,18 +1426,6 @@ static void twitter_login(PurpleAccount *acct)
 			0,   /* which connection step this is */
 			2);  /* total number of steps */
 
-	/* Check whether director ~/.libpurple-twitter-protocol
-	 * exists or not. Create it if not */
-	dir = g_build_filename (
-			g_get_home_dir(),
-			CONFIG_DIR,
-			NULL);
-	if (g_file_test (dir, G_FILE_TEST_EXISTS) == FALSE) {
-		if (g_mkdir (dir, S_IRWXU) != 0) {
-			// TODO what if fail?
-		}
-	}
-	g_free (dir);
 
 	twitter_verify_connection(acct);
 }
