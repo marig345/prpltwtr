@@ -1383,17 +1383,8 @@ static void twitter_verify_connection(PurpleAccount *acct)
 			acct, TWITTER_PREF_RETRIEVE_HISTORY,
 			TWITTER_PREF_RETRIEVE_HISTORY_DEFAULT);
 
-	//XXX
-	//if (TRUE)
-	//{
-		//PurpleConnection *gc = purple_account_get_connection(acct);
-		//purple_connection_update_progress(gc, "Connected",
-				//2,   /* which connection step this is */
-				//3);  /* total number of steps */
-		//purple_connection_set_state(gc, PURPLE_CONNECTED);
-		//return;
-	//}
-	if (retrieve_history) {
+	//If we don't have a stored last reply id, we don't want to get the entire history (EVERY reply)
+	if (retrieve_history && twitter_account_get_last_reply_id(acct) != 0) {
 		PurpleConnection *gc = purple_account_get_connection(acct);
 
 		if (purple_connection_get_state(gc) == PURPLE_CONNECTING) {
