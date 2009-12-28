@@ -279,6 +279,28 @@ static void twitter_buddy_update_icon(PurpleBuddy *buddy)
 	}
 }
 
+static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
+{
+	PurpleGroup *g;
+	PurpleChat *c = purple_blist_find_chat(account, searchtext);
+	GHashTable *components;
+	if (c != NULL)
+	{
+		return c;
+	}
+	g = purple_find_group("twitter");
+	if (g == NULL)
+		g = purple_group_new("twitter");
+	components = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+	g_hash_table_replace(components, g_strdup("search"), g_strdup(searchtext));
+	g_hash_table_replace(components, g_strdup("interval"), g_strdup_printf("%d",
+				purple_account_get_int(account,
+					TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT)));
+
+	c = purple_chat_new(account, searchtext, components);
+	purple_blist_add_chat(c, g, NULL);
+	return c;
+}
 static PurpleBuddy *twitter_buddy_new(PurpleAccount *account, const char *screenname, const char *alias)
 {
 	PurpleGroup *g;
@@ -870,26 +892,14 @@ static void get_saved_searches_cb (PurpleAccount *account,
 {
 	xmlnode *search;
 
-	//TODO XXX: fix this to work with chat rooms?
-	return;
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 	for (search = node->child; search; search = search->next) {
 		if (search->name && !g_strcmp0 (search->name, "saved_search")) {
-			PurpleBuddy *buddy;
 			gchar *query = xmlnode_get_child_data (search, "query");
-			gchar *screen_name;
 
-			/* We don't need PurpleBuddy to keep track of saved search */
-			screen_name = g_strdup_printf ("%s%s", SEARCH_PREFIX, query);
-			buddy = purple_find_buddy (account, screen_name);
-			if (!buddy)
-				buddy = twitter_buddy_new (account, screen_name, NULL);
-
-			purple_prpl_got_user_status (account, buddy->name, "online", NULL);
-
+			twitter_blist_chat_new(account, query);
 			g_free (query);
-			g_free (screen_name);
 		}
 	}
 }
