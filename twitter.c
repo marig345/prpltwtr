@@ -836,6 +836,12 @@ static void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const 
 			message,
 			time);
 }
+
+static PurpleConversation *twitter_conv_search_find(PurpleConnection *gc, const char *name)
+{
+	return purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, name, purple_connection_get_account(gc));
+}
+
 static void twitter_search_cb(PurpleAccount *account,
 		const GArray *search_results,
 		const gchar *refresh_url,
@@ -846,13 +852,17 @@ static void twitter_search_cb(PurpleAccount *account,
 	PurpleConnection *gc = purple_account_get_connection(account);
 	gint i, len = search_results->len;
 	gboolean add_link;
-	int chat_id;
+	PurpleConversation *conv;
 	PurpleConvChat *chat;
 
 	g_return_if_fail (ctx != NULL);
+	//
 	//TODO DEBUG stuff
-	chat_id = g_str_hash(ctx->src_user_name);
-	chat = PURPLE_CONV_CHAT(purple_find_chat(gc, chat_id));
+
+	conv = twitter_conv_search_find(gc, ctx->src_user_name);
+	g_return_if_fail (conv != NULL);
+
+	chat = PURPLE_CONV_CHAT(conv);
 
 	add_link = purple_account_get_bool (account,
 			TWITTER_PREF_ADD_URL_TO_TWEET,
@@ -1011,7 +1021,7 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 	const char *search = g_hash_table_lookup(components, "search");
 	const char *interval_str = g_hash_table_lookup(components, "interval");
-	int chat_id = g_str_hash(search); //fix this
+	static int chat_id = 1;
 	int interval = 0;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is performing search %s\n", gc->account->username, search);
 	int default_interval = purple_account_get_int(purple_connection_get_account(gc),
@@ -1023,11 +1033,11 @@ static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 	if (interval < 1)
 		interval = default_interval;
 
-	if (!purple_find_chat(gc, chat_id)) {
+	if (!twitter_conv_search_find(gc, search)) {
 			PurpleAccount *account = purple_connection_get_account(gc);
 			TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
 					search, search);
-			PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, search);
+			PurpleConversation *conv = serv_got_joined_chat(gc, chat_id++, search);
 			purple_conversation_set_data(conv, "twitter-chat-context", ctx);
 
 			twitter_api_search(account,
