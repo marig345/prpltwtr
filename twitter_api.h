@@ -47,7 +47,7 @@ void twitter_api_get_saved_searches (PurpleAccount *account,
 void twitter_api_search (PurpleAccount *account,
         const char *keyword,
         long long since_id,
-        uint rpp,
+        guint rpp,
         TwitterSearchSuccessFunc success_func,
         TwitterSearchErrorFunc error_func,
         gpointer data);

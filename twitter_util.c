@@ -3,6 +3,7 @@
  * Contact: Tan Miaoqing <rabbitrun84@gmail.com>
  */
 
+#include <string.h>
 #include "twitter_util.h"
 
 gchar *get_search_keyword (const gchar *name)
