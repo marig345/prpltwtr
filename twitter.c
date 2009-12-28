@@ -279,6 +279,48 @@ static void twitter_buddy_update_icon(PurpleBuddy *buddy)
 	}
 }
 
+/******************************************************
+ *  Chat
+ ******************************************************/
+static GList *twitter_chat_info(PurpleConnection *gc) {
+	struct proto_chat_entry *pce; /* defined in prpl.h */
+	GList *chat_info = NULL;
+
+	pce = g_new0(struct proto_chat_entry, 1);
+	pce->label = "Search";
+	pce->identifier = "search";
+	pce->required = TRUE;
+
+	chat_info = g_list_append(chat_info, pce);
+
+	pce = g_new0(struct proto_chat_entry, 1);
+	pce->label = "Update Interval";
+	pce->identifier = "interval";
+	pce->required = TRUE;
+	pce->is_int = TRUE;
+	pce->min = 1;
+	pce->max = 60;
+
+	chat_info = g_list_append(chat_info, pce);
+
+	return chat_info;
+}
+GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_name)
+{
+	GHashTable *defaults;
+
+	defaults = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
+
+	g_hash_table_insert(defaults, "search", g_strdup(chat_name));
+
+	//bug in pidgin prevents this from working
+	g_hash_table_insert(defaults, "interval",
+			g_strdup_printf("%d", purple_account_get_int(purple_connection_get_account(gc),
+					TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT)));
+	return defaults;
+}
+
+
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
 	PurpleGroup *g;
@@ -291,11 +333,8 @@ static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *se
 	g = purple_find_group("twitter");
 	if (g == NULL)
 		g = purple_group_new("twitter");
-	components = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
-	g_hash_table_replace(components, g_strdup("search"), g_strdup(searchtext));
-	g_hash_table_replace(components, g_strdup("interval"), g_strdup_printf("%d",
-				purple_account_get_int(account,
-					TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT)));
+
+	components = twitter_chat_info_defaults(purple_account_get_connection(account), searchtext);
 
 	c = purple_chat_new(account, searchtext, components);
 	purple_blist_add_chat(c, g, NULL);
@@ -902,45 +941,6 @@ static void get_saved_searches_cb (PurpleAccount *account,
 			g_free (query);
 		}
 	}
-}
-
-/******************************************************
- *  Chat
- ******************************************************/
-static GList *twitter_chat_info(PurpleConnection *gc) {
-	struct proto_chat_entry *pce; /* defined in prpl.h */
-	GList *chat_info = NULL;
-
-	pce = g_new0(struct proto_chat_entry, 1);
-	pce->label = "Search";
-	pce->identifier = "search";
-	pce->required = TRUE;
-
-	chat_info = g_list_append(chat_info, pce);
-
-	pce = g_new0(struct proto_chat_entry, 1);
-	pce->label = "Update Interval";
-	pce->identifier = "interval";
-	pce->required = TRUE;
-	pce->is_int = TRUE;
-	pce->min = 1;
-	pce->max = 60;
-
-	chat_info = g_list_append(chat_info, pce);
-
-	return chat_info;
-}
-GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_name)
-{
-	GHashTable *defaults;
-
-	defaults = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
-
-	//bug in pidgin prevents this from working
-	g_hash_table_insert(defaults, "interval",
-			g_strdup_printf("%d", purple_account_get_int(purple_connection_get_account(gc),
-					TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT)));
-	return defaults;
 }
 
 
