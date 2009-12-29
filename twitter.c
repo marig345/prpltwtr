@@ -321,10 +321,59 @@ GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_na
 }
 
 
+//Taken mostly from blist.c
+PurpleChat *twitter_blist_chat_find(PurpleAccount *account, const char *name)
+{
+	char *chat_name;
+	PurpleChat *chat;
+	PurpleBlistNode *node, *group;
+	char *normname;
+	PurpleBuddyList *purplebuddylist = purple_get_blist();
+	GHashTable *components;
+
+	g_return_val_if_fail(purplebuddylist != NULL, NULL);
+	g_return_val_if_fail((name != NULL) && (*name != '\0'), NULL);
+
+	normname = g_strdup(purple_normalize(account, name));
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Account %s searching for chat %s\n",
+		account->username,
+		name == NULL ? "NULL" : name);
+
+	if (normname == NULL)
+	{
+		return NULL;
+	}
+	for (group = purplebuddylist->root; group != NULL; group = group->next) {
+		for (node = group->child; node != NULL; node = node->next) {
+			if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
+
+				chat = (PurpleChat*)node;
+
+				if (account != chat->account)
+					continue;
+
+				components = purple_chat_get_components(chat);
+				if (components != NULL)
+				{
+					chat_name = g_hash_table_lookup(components, "search");
+
+					if (chat_name != NULL && !strcmp(purple_normalize(account, chat_name), normname))
+					{
+						g_free(normname);
+						return chat;
+					}
+				}
+			}
+		}
+	}
+
+	g_free(normname);
+	return NULL;
+}
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
 	PurpleGroup *g;
-	PurpleChat *c = purple_blist_find_chat(account, searchtext);
+	PurpleChat *c = twitter_blist_chat_find(account, searchtext);
 	GHashTable *components;
 	if (c != NULL)
 	{
@@ -1023,7 +1072,7 @@ static gint twitter_get_next_chat_id()
 //Create a unique name for each search. This way we don't conflict with the name a timeline
 static gchar *twitter_chat_search_get_name(const char *search)
 {
-	return g_strdup_printf("#%s", search);
+	return g_strdup_printf("0%s", search);
 }
 static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *components) {
 	const char *search = g_hash_table_lookup(components, "search");
@@ -1847,7 +1896,7 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL,	       /* remove_group */
 	NULL,//TODO?				/* get_cb_real_name */
 	NULL,	     /* set_chat_topic */
-	NULL,				/* find_blist_chat */
+	twitter_blist_chat_find,				/* find_blist_chat */
 	NULL,	  /* roomlist_get_list */
 	NULL,	    /* roomlist_cancel */
 	NULL,   /* roomlist_expand_category */
