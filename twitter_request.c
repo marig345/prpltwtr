@@ -55,7 +55,7 @@ typedef struct
 	char *query_string;
 	TwitterSendRequestMultiPageSuccessFunc success_callback;
 	TwitterSendRequestMultiPageErrorFunc error_callback;
-    int page;
+	int page;
 	int expected_count;
 } TwitterMultiPageRequestData;
 
@@ -68,22 +68,22 @@ typedef struct
 } TwitterMultiPageAllRequestData;
 
 typedef struct {
-    GList *nodes;
-    long long next_cursor;
-    gchar *url;
-    gchar *query_string;
+	GList *nodes;
+	long long next_cursor;
+	gchar *url;
+	gchar *query_string;
 
-    TwitterSendRequestMultiPageAllSuccessFunc success_callback;
-    TwitterSendRequestMultiPageAllErrorFunc error_callback;
-    gpointer user_data;
+	TwitterSendRequestMultiPageAllSuccessFunc success_callback;
+	TwitterSendRequestMultiPageAllErrorFunc error_callback;
+	gpointer user_data;
 } TwitterRequestWithCursorData;
 
 void twitter_send_request_multipage_do(PurpleAccount *account,
 		TwitterMultiPageRequestData *request_data);
 
 static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
-        xmlnode *node,
-        gpointer user_data);
+		xmlnode *node,
+		gpointer user_data);
 
 void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_data,
 		const gchar *url_text, gsize len,
@@ -152,8 +152,8 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
 	gboolean use_https = purple_account_get_bool(account, "use_https", FALSE) && purple_ssl_is_supported();
 	const char *host = purple_account_get_string (
-	        account, TWITTER_PREF_HOST_URL,
-            TWITTER_PREF_HOST_URL_DEFAULT); /* by default "twitter.com" */
+			account, TWITTER_PREF_HOST_URL,
+			TWITTER_PREF_HOST_URL_DEFAULT); /* by default "twitter.com" */
 	TwitterSendRequestData *request_data = g_new0(TwitterSendRequestData, 1);
 	char *full_url = g_strdup_printf("%s://%s%s",
 			use_https ? "https" : "http",
@@ -204,26 +204,26 @@ void twitter_send_request_multipage_cb(PurpleAccount *account, xmlnode *node, gp
 	}
 
 	if (count < request_data->expected_count)
-	    last_page = TRUE;
+		last_page = TRUE;
 
 	purple_debug_info("twitter--",
-	        "%s: last_page: %s, count: %d, expected_count: %d\n",
-	        G_STRFUNC, last_page?"yes":"no",
-            count, request_data->expected_count);
+			"%s: last_page: %s, count: %d, expected_count: %d\n",
+			G_STRFUNC, last_page?"yes":"no",
+			count, request_data->expected_count);
 
 	if (!request_data->success_callback) {
-	    get_next_page = TRUE;
+		get_next_page = TRUE;
 
-	    purple_debug_info("twitter--",
-	            "%s no request_data->success_callback, get_next_page: yes\n",
-	            G_STRFUNC);
+		purple_debug_info("twitter--",
+				"%s no request_data->success_callback, get_next_page: yes\n",
+				G_STRFUNC);
 	}
 	else {
 		get_next_page = request_data->success_callback(account, node, last_page, request_data->user_data);
 
 		purple_debug_info("twitter--",
-                "%s get_next_page: %s\n",
-                G_STRFUNC, get_next_page?"yes":"no");
+				"%s get_next_page: %s\n",
+				G_STRFUNC, get_next_page?"yes":"no");
 	}
 
 	if (last_page)
@@ -345,92 +345,92 @@ void twitter_send_request_multipage_all(PurpleAccount *account,
  ******************************************************/
 
 static void twitter_request_with_cursor_data_free (
-        TwitterRequestWithCursorData *request_data)
+		TwitterRequestWithCursorData *request_data)
 {
-    GList *l;
+	GList *l;
 
-    for (l = request_data->nodes; l; l = l->next)
-        xmlnode_free (l->data);
-    g_list_free (request_data->nodes);
-    g_free (request_data->url);
-    g_free (request_data->query_string);
-    g_slice_free (TwitterRequestWithCursorData, request_data);
+	for (l = request_data->nodes; l; l = l->next)
+		xmlnode_free (l->data);
+	g_list_free (request_data->nodes);
+	g_free (request_data->url);
+	g_free (request_data->query_string);
+	g_slice_free (TwitterRequestWithCursorData, request_data);
 }
 
 static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
-        xmlnode *node,
-        gpointer user_data)
+		xmlnode *node,
+		gpointer user_data)
 {
-    TwitterRequestWithCursorData *request_data = user_data;
-    xmlnode *users;
-    gchar *next_cursor_str;
+	TwitterRequestWithCursorData *request_data = user_data;
+	xmlnode *users;
+	gchar *next_cursor_str;
 
-    next_cursor_str = xmlnode_get_child_data (node, "next_cursor");
-    request_data->next_cursor = strtoll (next_cursor_str, NULL, 10);
-    g_free (next_cursor_str);
+	next_cursor_str = xmlnode_get_child_data (node, "next_cursor");
+	request_data->next_cursor = strtoll (next_cursor_str, NULL, 10);
+	g_free (next_cursor_str);
 
-    purple_debug_info ("twitter--", "%s next_cursor: %lld\n",
-            G_STRFUNC, request_data->next_cursor);
+	purple_debug_info ("twitter--", "%s next_cursor: %lld\n",
+			G_STRFUNC, request_data->next_cursor);
 
-    users = xmlnode_get_child (node, "users");
-    if (users) {
-        request_data->nodes = g_list_prepend (request_data->nodes,
-                xmlnode_copy (users));
-    }
+	users = xmlnode_get_child (node, "users");
+	if (users) {
+		request_data->nodes = g_list_prepend (request_data->nodes,
+				xmlnode_copy (users));
+	}
 
-    if (request_data->next_cursor) {
-        gchar *full_query_string;
+	if (request_data->next_cursor) {
+		gchar *full_query_string;
 
-        if (request_data->query_string)
-            full_query_string = g_strdup_printf ("%s&cursor=%lld",
-                    request_data->query_string,
-                    request_data->next_cursor);
-        else
-            full_query_string = g_strdup_printf ("cursor=%lld",
-                    request_data->next_cursor);
+		if (request_data->query_string)
+			full_query_string = g_strdup_printf ("%s&cursor=%lld",
+					request_data->query_string,
+					request_data->next_cursor);
+		else
+			full_query_string = g_strdup_printf ("cursor=%lld",
+					request_data->next_cursor);
 
-        twitter_send_request (account, FALSE,
-                request_data->url, full_query_string,
-                twitter_send_request_with_cursor_cb,
-                NULL,
-                request_data);
+		twitter_send_request (account, FALSE,
+				request_data->url, full_query_string,
+				twitter_send_request_with_cursor_cb,
+				NULL,
+				request_data);
 
-        g_free (full_query_string);
-    }
-    else {
-        request_data->success_callback (account,
-                request_data->nodes,
-                request_data->user_data);
-        twitter_request_with_cursor_data_free (request_data);
-    }
+		g_free (full_query_string);
+	}
+	else {
+		request_data->success_callback (account,
+				request_data->nodes,
+				request_data->user_data);
+		twitter_request_with_cursor_data_free (request_data);
+	}
 }
 
 void twitter_send_request_with_cursor (PurpleAccount *account,
-       const char *url, const char *query_string, long long cursor,
-       TwitterSendRequestMultiPageAllSuccessFunc success_callback,
-       TwitterSendRequestMultiPageAllErrorFunc error_callback,
-       gpointer data)
+		const char *url, const char *query_string, long long cursor,
+		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
+		TwitterSendRequestMultiPageAllErrorFunc error_callback,
+		gpointer data)
 {
-    gchar *full_query_string;
+	gchar *full_query_string;
 
-    if (query_string)
-        full_query_string = g_strdup_printf ("%s&cursor=%lld",
-                query_string, cursor);
-    else
-        full_query_string = g_strdup_printf ("cursor=%lld", cursor);
+	if (query_string)
+		full_query_string = g_strdup_printf ("%s&cursor=%lld",
+				query_string, cursor);
+	else
+		full_query_string = g_strdup_printf ("cursor=%lld", cursor);
 
-    TwitterRequestWithCursorData *request_data = g_slice_new0 (TwitterRequestWithCursorData);
-    request_data->url = g_strdup (url);
-    request_data->query_string = g_strdup (query_string);
-    request_data->success_callback = success_callback;
-    request_data->error_callback = error_callback;
-    request_data->user_data = data;
+	TwitterRequestWithCursorData *request_data = g_slice_new0 (TwitterRequestWithCursorData);
+	request_data->url = g_strdup (url);
+	request_data->query_string = g_strdup (query_string);
+	request_data->success_callback = success_callback;
+	request_data->error_callback = error_callback;
+	request_data->user_data = data;
 
-    twitter_send_request (account, FALSE,
-            url, full_query_string,
-            twitter_send_request_with_cursor_cb,
-            NULL,
-            request_data);
+	twitter_send_request (account, FALSE,
+			url, full_query_string,
+			twitter_send_request_with_cursor_cb,
+			NULL,
+			request_data);
 
-    g_free (full_query_string);
+	g_free (full_query_string);
 }
