@@ -60,6 +60,12 @@ static const char *twitter_api_get_pref_host_url(PurpleAccount *account)
 			TWITTER_PREF_HOST_URL, TWITTER_PREF_HOST_URL_DEFAULT);
 }
 
+static const char *twitter_api_get_pref_host_api_url(PurpleAccount *account)
+{
+	return purple_account_get_string(account,
+			TWITTER_PREF_HOST_API_URL, TWITTER_PREF_HOST_API_URL_DEFAULT);
+}
+
 void twitter_api_get_rate_limit_status(PurpleAccount *account,
 		TwitterSendRequestSuccessFunc success_func,
 		TwitterSendRequestErrorFunc error_func,
@@ -83,6 +89,48 @@ void twitter_api_get_friends(PurpleAccount *account,
 			success_func, error_func, data);
 }
 
+void twitter_api_get_home_timeline(PurpleAccount *account,
+		long long since_id,
+		int count,
+		int page,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data)
+{
+	char *query = since_id ?
+		g_strdup_printf("count=%d&page=%d&since_id=%lld", count, page, since_id) :
+		g_strdup_printf("count=%d&page=%d", count, page);
+
+	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+
+	twitter_send_request(account, FALSE,
+			twitter_api_get_pref_host_api_url(account),
+			"/1/statuses/home_timeline.xml", query,
+			success_func, error_func, data);
+
+	g_free(query);
+}
+
+void twitter_api_get_home_timeline_all(PurpleAccount *account,
+		long long since_id,
+		TwitterSendRequestMultiPageAllSuccessFunc success_func,
+		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gpointer data)
+{
+	int count = TWITTER_EVERY_REPLIES_COUNT; //TODO set this its own pref
+	char *query = since_id ?
+		g_strdup_printf ("since_id=%lld&count=%d", since_id, count) :
+		g_strdup_printf ("count=%d", count);
+
+	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+
+	twitter_send_request_multipage_all(account,
+			twitter_api_get_pref_host_api_url(account),
+			"/1/statuses/home_timeline.xml", query,
+			success_func, error_func,
+			count, data);
+	g_free(query);
+}
 void twitter_api_get_replies(PurpleAccount *account,
 		long long since_id,
 		int count,
@@ -122,7 +170,7 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 			twitter_api_get_pref_host_url(account),
 			"/statuses/mentions.xml", query,
 			success_func, error_func,
-			count, NULL);
+			count, data);
 	g_free(query);
 }
 
