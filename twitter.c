@@ -1724,34 +1724,44 @@ static void twitter_set_info(PurpleConnection *gc, const char *info) {
 
 static void twitter_get_info(PurpleConnection *gc, const char *username) {
 	//TODO: error check
-	PurpleBuddy *b = purple_find_buddy(purple_connection_get_account(gc), username);
-	TwitterBuddyData *data = twitter_buddy_get_buddy_data(b);
-	if (!data)
-	{
-		//TODO?
-		return;
-	}
-	TwitterUserData *user_data = data->user;
-	TwitterStatusData *status_data = data->status;
-
+	//TODO: fix for buddy not on list?
 	PurpleNotifyUserInfo *info = purple_notify_user_info_new();
+	PurpleBuddy *b = purple_find_buddy(purple_connection_get_account(gc), username);
 
-	//body = _("No user info.");
-	if (user_data)
+	if (b)
 	{
-		purple_notify_user_info_add_pair(info, "Description:", user_data->description);
-	}
-	if (status_data)
-	{
-		purple_notify_user_info_add_pair(info, "Status:", status_data->text);
-	}
+		TwitterBuddyData *data = twitter_buddy_get_buddy_data(b);
+		if (data)
+		{
+			TwitterUserData *user_data = data->user;
+			TwitterStatusData *status_data = data->status;
 
-	/* show a buddy's user info in a nice dialog box */
-	purple_notify_userinfo(gc,	/* connection the buddy info came through */
-			username,  /* buddy's username */
-			info,      /* body */
-			NULL,      /* callback called when dialog closed */
-			NULL);     /* userdata for callback */
+
+			if (user_data)
+			{
+				purple_notify_user_info_add_pair(info, "Description:", user_data->description);
+			}
+			if (status_data)
+			{
+				purple_notify_user_info_add_pair(info, "Status:", status_data->text);
+			}
+
+			/* show a buddy's user info in a nice dialog box */
+			purple_notify_userinfo(gc,	/* connection the buddy info came through */
+					username,  /* buddy's username */
+					info,      /* body */
+					NULL,      /* callback called when dialog closed */
+					NULL);     /* userdata for callback */
+			return;
+		}
+	}
+	purple_notify_user_info_add_pair(info, "Description:", "No user info");
+	purple_notify_userinfo(gc,
+		username,
+		info,
+		NULL,
+		NULL);
+
 }
 
 
@@ -1826,6 +1836,7 @@ static void twitter_remove_buddies(PurpleConnection *gc, GList *buddies,
 }
 
 static void twitter_get_cb_info(PurpleConnection *gc, int id, const char *who) {
+	//TODO FIX ME
 	PurpleConversation *conv = purple_find_chat(gc, id);
 	purple_debug_info(TWITTER_PROTOCOL_ID,
 			"retrieving %s's info for %s in chat room %s\n", who,
