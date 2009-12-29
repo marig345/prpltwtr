@@ -54,6 +54,11 @@
 #include "twitter_request.h"
 #include "twitter_search.h"
 #include "twitter_api.h"
+static const char *twitter_api_get_pref_host_url(PurpleAccount *account)
+{
+	return purple_account_get_string(account,
+			TWITTER_PREF_HOST_URL, TWITTER_PREF_HOST_URL_DEFAULT);
+}
 
 void twitter_api_get_rate_limit_status(PurpleAccount *account,
 		TwitterSendRequestSuccessFunc success_func,
@@ -61,6 +66,7 @@ void twitter_api_get_rate_limit_status(PurpleAccount *account,
 		gpointer data)
 {
 	twitter_send_request(account, FALSE,
+			twitter_api_get_pref_host_url(account),
 			"/account/rate_limit_status.xml", NULL,
 			success_func, error_func, data);
 }
@@ -72,6 +78,7 @@ void twitter_api_get_friends(PurpleAccount *account,
 	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
 
 	twitter_send_request_with_cursor (account,
+			twitter_api_get_pref_host_url(account),
 			"/statuses/friends.xml", NULL, -1,
 			success_func, error_func, data);
 }
@@ -91,6 +98,7 @@ void twitter_api_get_replies(PurpleAccount *account,
 	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
 
 	twitter_send_request(account, FALSE,
+			twitter_api_get_pref_host_url(account),
 			"/statuses/mentions.xml", query,
 			success_func, error_func, data);
 
@@ -111,13 +119,14 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
 
 	twitter_send_request_multipage_all(account,
+			twitter_api_get_pref_host_url(account),
 			"/statuses/mentions.xml", query,
 			success_func, error_func,
 			count, NULL);
 	g_free(query);
 }
 
-void twitter_api_set_status(PurpleAccount *acct,
+void twitter_api_set_status(PurpleAccount *account,
 		const char *msg,
 		long long in_reply_to_status_id,
 		TwitterSendRequestSuccessFunc success_func,
@@ -130,7 +139,8 @@ void twitter_api_set_status(PurpleAccount *acct,
 			g_strdup_printf ("status=%s&in_reply_to_status_id=%lld",
 					purple_url_encode(msg), in_reply_to_status_id) :
 			g_strdup_printf("status=%s", purple_url_encode(msg));
-		twitter_send_request(acct, TRUE,
+		twitter_send_request(account, TRUE,
+				twitter_api_get_pref_host_url(account),
 				"/statuses/update.xml", query,
 				success_func, NULL, data);
 		g_free(query);
@@ -139,7 +149,7 @@ void twitter_api_set_status(PurpleAccount *acct,
 	}
 }
 
-void twitter_api_send_dm(PurpleAccount *acct,
+void twitter_api_send_dm(PurpleAccount *account,
 		const char *user,
 		const char *msg,
 		TwitterSendRequestSuccessFunc success_func,
@@ -151,7 +161,8 @@ void twitter_api_send_dm(PurpleAccount *acct,
 		char *user_encoded = g_strdup(purple_url_encode(user));
 		char *query = g_strdup_printf ("text=%s&user=%s",
 				purple_url_encode(msg), user_encoded);
-		twitter_send_request(acct, TRUE,
+		twitter_send_request(account, TRUE,
+				twitter_api_get_pref_host_url(account),
 				"/direct_messages/new.xml", query,
 				success_func, NULL, data);
 		g_free(user_encoded);
@@ -169,6 +180,7 @@ void twitter_api_get_saved_searches (PurpleAccount *account,
 	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
 
 	twitter_send_request (account, FALSE,
+			twitter_api_get_pref_host_url(account),
 			"/saved_searches.xml", NULL,
 			success_func, error_func, data);
 }

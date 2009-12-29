@@ -41,6 +41,8 @@
 
 #define USER_AGENT "Mozilla/4.0 (compatible; MSIE 5.5)"
 
+//TODO: clean this up to be a bit more robust. 
+
 typedef struct {
 	PurpleAccount *account;
 	TwitterSendRequestSuccessFunc success_func;
@@ -51,6 +53,7 @@ typedef struct {
 typedef struct
 {
 	gpointer user_data;
+	char *host;
 	char *url;
 	char *query_string;
 	TwitterSendRequestMultiPageSuccessFunc success_callback;
@@ -70,6 +73,7 @@ typedef struct
 typedef struct {
 	GList *nodes;
 	long long next_cursor;
+	gchar *host;
 	gchar *url;
 	gchar *query_string;
 
@@ -140,8 +144,9 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 	g_free(request_data);
 }
 
+//TODO: this should really just take in an object of options. Getting unwieldy
 void twitter_send_request(PurpleAccount *account, gboolean post,
-		const char *url, const char *query_string,
+		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
@@ -151,9 +156,6 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 	char *auth_text = g_strdup_printf("%s:%s", sn, pass);
 	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
 	gboolean use_https = purple_account_get_bool(account, "use_https", FALSE) && purple_ssl_is_supported();
-	const char *host = purple_account_get_string (
-			account, TWITTER_PREF_HOST_URL,
-			TWITTER_PREF_HOST_URL_DEFAULT); /* by default "twitter.com" */
 	TwitterSendRequestData *request_data = g_new0(TwitterSendRequestData, 1);
 	char *full_url = g_strdup_printf("%s://%s%s",
 			use_https ? "https" : "http",
@@ -228,6 +230,7 @@ void twitter_send_request_multipage_cb(PurpleAccount *account, xmlnode *node, gp
 
 	if (last_page)
 	{
+		g_free(request_data->host);
 		g_free(request_data->url);
 		if (request_data->query_string)
 			g_free(request_data->query_string);
@@ -261,7 +264,7 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 	purple_debug_info("twitter--", "%s: page: %d\n", G_STRFUNC, request_data->page);
 
 	twitter_send_request(account, FALSE,
-			request_data->url, full_query_string,
+			request_data->host, request_data->url, full_query_string,
 			twitter_send_request_multipage_cb, twitter_send_request_multipage_error_cb,
 			request_data);
 	g_free(full_query_string);
@@ -269,13 +272,14 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 
 //don't include count in the query_string
 void twitter_send_request_multipage(PurpleAccount *account,
-		const char *url, const char *query_string,
+		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestMultiPageSuccessFunc success_callback,
 		TwitterSendRequestMultiPageErrorFunc error_callback,
 		int expected_count, gpointer data)
 {
 	TwitterMultiPageRequestData *request_data = g_new0(TwitterMultiPageRequestData, 1);
 	request_data->user_data = data;
+	request_data->host = g_strdup(host);
 	request_data->url = g_strdup(url);
 	request_data->query_string = query_string ? g_strdup(query_string) : NULL;
 	request_data->success_callback = success_callback;
@@ -322,7 +326,7 @@ static gboolean twitter_send_request_multipage_all_error_cb(PurpleAccount *acct,
 }
 
 void twitter_send_request_multipage_all(PurpleAccount *account,
-		const char *url, const char *query_string,
+		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
 		int expected_count, gpointer data)
@@ -334,7 +338,7 @@ void twitter_send_request_multipage_all(PurpleAccount *account,
 	request_data_all->user_data = data;
 
 	twitter_send_request_multipage(account,
-			url, query_string,
+			host, url, query_string,
 			twitter_send_request_multipage_all_success_cb,
 			twitter_send_request_multipage_all_error_cb,
 			expected_count, request_data_all);
@@ -352,6 +356,7 @@ static void twitter_request_with_cursor_data_free (
 	for (l = request_data->nodes; l; l = l->next)
 		xmlnode_free (l->data);
 	g_list_free (request_data->nodes);
+	g_free (request_data->host);
 	g_free (request_data->url);
 	g_free (request_data->query_string);
 	g_slice_free (TwitterRequestWithCursorData, request_data);
@@ -390,7 +395,7 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 					request_data->next_cursor);
 
 		twitter_send_request (account, FALSE,
-				request_data->url, full_query_string,
+				request_data->host, request_data->url, full_query_string,
 				twitter_send_request_with_cursor_cb,
 				NULL,
 				request_data);
@@ -406,7 +411,7 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 }
 
 void twitter_send_request_with_cursor (PurpleAccount *account,
-		const char *url, const char *query_string, long long cursor,
+		const char *host, const char *url, const char *query_string, long long cursor,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
 		gpointer data)
@@ -420,6 +425,7 @@ void twitter_send_request_with_cursor (PurpleAccount *account,
 		full_query_string = g_strdup_printf ("cursor=%lld", cursor);
 
 	TwitterRequestWithCursorData *request_data = g_slice_new0 (TwitterRequestWithCursorData);
+	request_data->host = g_strdup (host);
 	request_data->url = g_strdup (url);
 	request_data->query_string = g_strdup (query_string);
 	request_data->success_callback = success_callback;
@@ -427,7 +433,7 @@ void twitter_send_request_with_cursor (PurpleAccount *account,
 	request_data->user_data = data;
 
 	twitter_send_request (account, FALSE,
-			url, full_query_string,
+			host, url, full_query_string,
 			twitter_send_request_with_cursor_cb,
 			NULL,
 			request_data);
