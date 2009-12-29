@@ -68,6 +68,7 @@ typedef struct
 	gchar *src_user_name; /* e.g. #N900 */
 	gchar *keyword; /* e.g. N900 */
 	gchar *refresh_url; /* e.g. ?since_id=6276370030&q=n900 */
+	guint chat_id; /* conv chat id */
 
 	long long last_tweet_id;
 	guint timer_handle;
@@ -841,7 +842,6 @@ static PurpleConversation *twitter_conv_search_find(PurpleConnection *gc, const 
 {
 	return purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, name, purple_connection_get_account(gc));
 }
-
 static void twitter_search_cb(PurpleAccount *account,
 		const GArray *search_results,
 		const gchar *refresh_url,
@@ -859,8 +859,8 @@ static void twitter_search_cb(PurpleAccount *account,
 	//
 	//TODO DEBUG stuff
 
-	conv = twitter_conv_search_find(gc, ctx->src_user_name);
-	g_return_if_fail (conv != NULL);
+	conv = purple_find_chat(gc, ctx->chat_id);
+	g_return_if_fail (conv != NULL); //destroy context
 
 	chat = PURPLE_CONV_CHAT(conv);
 
@@ -926,12 +926,13 @@ static gboolean twitter_search_timeout(gpointer data)
 }
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
-		const char *src_user_name, const char *keyword)
+		const char *src_user_name, const char *keyword, guint chat_id)
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 	ctx->account = account;
 	ctx->src_user_name = g_strdup(src_user_name);
 	ctx->keyword = g_strdup(keyword);
+	ctx->chat_id = chat_id;
 	return ctx;
 }
 
@@ -1018,42 +1019,71 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 	}
 }
 
-static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
+static gint twitter_get_next_chat_id()
+{
+	static gint chat_id = 1;
+	return chat_id++;
+}
+
+//Create a unique name for each search. This way we don't conflict with the name a timeline
+static gchar *twitter_chat_search_get_name(const char *search)
+{
+	return g_strdup_printf("#%s", search);
+}
+static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *components) {
 	const char *search = g_hash_table_lookup(components, "search");
 	const char *interval_str = g_hash_table_lookup(components, "interval");
-	static int chat_id = 1;
 	int interval = 0;
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is performing search %s\n", gc->account->username, search);
 	int default_interval = purple_account_get_int(purple_connection_get_account(gc),
 			TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT);
+	gchar *name;
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is performing search %s\n", gc->account->username, search);
 
 	g_return_if_fail(search != NULL);
+
+	name = twitter_chat_search_get_name(search);
 
 	interval = strtol(interval_str, NULL, 10);
 	if (interval < 1)
 		interval = default_interval;
 
-	if (!twitter_conv_search_find(gc, search)) {
-			PurpleAccount *account = purple_connection_get_account(gc);
-			TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
-					search, search);
-			PurpleConversation *conv = serv_got_joined_chat(gc, chat_id++, search);
-			purple_conversation_set_data(conv, "twitter-chat-context", ctx);
+	if (!twitter_conv_search_find(gc, name)) {
+		guint chat_id = twitter_get_next_chat_id();
+		PurpleAccount *account = purple_connection_get_account(gc);
+		TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
+				search, search, chat_id);
+		PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, name);
+		purple_conversation_set_title(conv, search);
+		purple_conversation_set_data(conv, "twitter-chat-context", ctx);
 
-			twitter_api_search(account,
-					search, ctx->last_tweet_id,
-					TWITTER_SEARCH_RPP_DEFAULT,
-					twitter_search_cb, NULL, ctx);
+		twitter_api_search(account,
+				search, ctx->last_tweet_id,
+				TWITTER_SEARCH_RPP_DEFAULT,
+				twitter_search_cb, NULL, ctx);
 
 
-			ctx->timer_handle = purple_timeout_add_seconds(
-					60 * interval,
-					twitter_search_timeout, ctx);
+		ctx->timer_handle = purple_timeout_add_seconds(
+				60 * interval,
+				twitter_search_timeout, ctx);
 	} else {
 		char *tmp = g_strdup_printf("Search %s is already open.", search);
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Search %s is already open.", search);
 		purple_notify_info(gc, "Perform Search", "Perform Search", tmp);
 		g_free(tmp);
+	}
+
+	g_free(name);
+}
+static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
+	const char *conv_type_str = g_hash_table_lookup(components, "conv_type");
+	if (conv_type_str == NULL || !strcmp(conv_type_str, "0")) //TODO
+	{
+		twitter_chat_search_join(gc, components);
+	}
+	else if (!strcmp(conv_type_str, "1"))  //see where this is going?
+	{
+		//twitter_chat_timeline_join(gc, components);
 	}
 }
 
