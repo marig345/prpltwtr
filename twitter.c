@@ -56,6 +56,12 @@ struct _TwitterStatusData
 	time_t created_at;
 };
 
+typedef enum
+{
+	TWITTER_CHAT_SEARCH = 0,
+	TWITTER_CHAT_TIMELINE = 1
+} TwitterChatType;
+
 typedef struct
 {
 	TwitterStatusData *status;
@@ -305,6 +311,7 @@ static GList *twitter_chat_info(PurpleConnection *gc) {
 
 	return chat_info;
 }
+
 GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_name)
 {
 	GHashTable *defaults;
@@ -320,11 +327,13 @@ GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_na
 	return defaults;
 }
 
-
 //Taken mostly from blist.c
-PurpleChat *twitter_blist_chat_find(PurpleAccount *account, const char *name)
+static PurpleChat *_twitter_blist_chat_find(PurpleAccount *account, TwitterChatType chat_type,
+	const char *component_key, const char *component_value)
 {
-	char *chat_name;
+	const char *node_chat_name;
+	gint node_chat_type = 0;
+	const char *node_chat_type_str;
 	PurpleChat *chat;
 	PurpleBlistNode *node, *group;
 	char *normname;
@@ -332,12 +341,13 @@ PurpleChat *twitter_blist_chat_find(PurpleAccount *account, const char *name)
 	GHashTable *components;
 
 	g_return_val_if_fail(purplebuddylist != NULL, NULL);
-	g_return_val_if_fail((name != NULL) && (*name != '\0'), NULL);
+	g_return_val_if_fail((component_value != NULL) && (*component_value != '\0'), NULL);
 
-	normname = g_strdup(purple_normalize(account, name));
-	purple_debug_info(TWITTER_PROTOCOL_ID, "Account %s searching for chat %s\n",
+	normname = g_strdup(purple_normalize(account, component_value));
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Account %s searching for chat %s type %d\n",
 		account->username,
-		name == NULL ? "NULL" : name);
+		component_value == NULL ? "NULL" : component_value,
+		chat_type);
 
 	if (normname == NULL)
 	{
@@ -355,9 +365,11 @@ PurpleChat *twitter_blist_chat_find(PurpleAccount *account, const char *name)
 				components = purple_chat_get_components(chat);
 				if (components != NULL)
 				{
-					chat_name = g_hash_table_lookup(components, "search");
+					node_chat_type_str = g_hash_table_lookup(components, "chat_type");
+					node_chat_name = g_hash_table_lookup(components, component_key);
+					node_chat_type = node_chat_type_str == NULL ? 0 : strtol(node_chat_type_str, NULL, 10);
 
-					if (chat_name != NULL && !strcmp(purple_normalize(account, chat_name), normname))
+					if (node_chat_name != NULL && node_chat_type == chat_type && !strcmp(purple_normalize(account, node_chat_name), normname))
 					{
 						g_free(normname);
 						return chat;
@@ -370,10 +382,16 @@ PurpleChat *twitter_blist_chat_find(PurpleAccount *account, const char *name)
 	g_free(normname);
 	return NULL;
 }
+
+static PurpleChat *twitter_blist_chat_find_search(PurpleAccount *account, const char *name)
+{
+	return _twitter_blist_chat_find(account, TWITTER_CHAT_SEARCH, "search", name);
+}
+
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
 	PurpleGroup *g;
-	PurpleChat *c = twitter_blist_chat_find(account, searchtext);
+	PurpleChat *c = twitter_blist_chat_find_search(account, searchtext);
 	GHashTable *components;
 	if (c != NULL)
 	{
@@ -1896,7 +1914,7 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL,	       /* remove_group */
 	NULL,//TODO?				/* get_cb_real_name */
 	NULL,	     /* set_chat_topic */
-	twitter_blist_chat_find,				/* find_blist_chat */
+	NULL,				/* find_blist_chat */
 	NULL,	  /* roomlist_get_list */
 	NULL,	    /* roomlist_cancel */
 	NULL,   /* roomlist_expand_category */
