@@ -22,6 +22,9 @@
 #define TWITTER_PREF_HOST_URL "host_url"
 #define TWITTER_PREF_HOST_URL_DEFAULT "twitter.com"
 
+#define TWITTER_PREF_HOST_API_URL "api_host_url"
+#define TWITTER_PREF_HOST_API_URL_DEFAULT "api.twitter.com"
+
 #define TWITTER_PREF_SEARCH_HOST_URL "search_host_url"
 #define TWITTER_PREF_SEARCH_HOST_URL_DEFAULT "search.twitter.com"
 

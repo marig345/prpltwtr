@@ -1978,10 +1978,19 @@ static void twitter_init(PurplePlugin *plugin)
 	/* API host URL. twitter.com by default.
 	 * Users can change it to a proxy URL
 	 * This can fuck GFW (http://en.wikipedia.org/wiki/Golden_Shield_Project) */
+	/* WOAH WOAH WOAH, who's using that sort of language in the comments?
+	 * Then again, fuck the GFW */
 	option = purple_account_option_string_new (
 			("Host URL"),      /* text shown to user */
 			TWITTER_PREF_HOST_URL,                         /* pref name */
 			TWITTER_PREF_HOST_URL_DEFAULT);                        /* default value */
+	prpl_info.protocol_options = g_list_append(prpl_info.protocol_options, option);
+
+	/* API2.0 host url? Why does twitter hate us? */
+	option = purple_account_option_string_new (
+			("API Host URL"),      /* text shown to user */
+			TWITTER_PREF_HOST_API_URL,                         /* pref name */
+			TWITTER_PREF_HOST_API_URL_DEFAULT);                        /* default value */
 	prpl_info.protocol_options = g_list_append(prpl_info.protocol_options, option);
 
 	/* Search API host URL. search.twitter.com by default */
