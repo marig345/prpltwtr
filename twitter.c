@@ -65,8 +65,7 @@ typedef struct
 typedef struct
 {
 	PurpleAccount *account;
-	gchar *src_user_name; /* e.g. #N900 */
-	gchar *keyword; /* e.g. N900 */
+	gchar *search_text; /* e.g. N900 */
 	gchar *refresh_url; /* e.g. ?since_id=6276370030&q=n900 */
 	guint chat_id; /* conv chat id */
 
@@ -807,11 +806,8 @@ static void _twitter_search_timeout_context_destory (TwitterSearchTimeoutContext
 	}
 	ctx->last_tweet_id = 0;
 
-	g_free (ctx->src_user_name);
-	ctx->src_user_name = NULL;
-
-	g_free (ctx->keyword);
-	ctx->keyword = NULL;
+	g_free (ctx->search_text);
+	ctx->search_text = NULL;
 
 	g_free (ctx->refresh_url);
 	ctx->refresh_url = NULL;
@@ -911,7 +907,7 @@ static gboolean twitter_search_timeout(gpointer data)
 		gchar *refresh_url;
 
 		refresh_url = g_strdup_printf ("?q=%s&since_id=%lld",
-				purple_url_encode(ctx->keyword), ctx->last_tweet_id);
+				purple_url_encode(ctx->search_text), ctx->last_tweet_id);
 
 		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, create refresh_url: %s\n",
 				G_STRFUNC, refresh_url);
@@ -926,12 +922,11 @@ static gboolean twitter_search_timeout(gpointer data)
 }
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
-		const char *src_user_name, const char *keyword, guint chat_id)
+		const char *search_text, guint chat_id)
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 	ctx->account = account;
-	ctx->src_user_name = g_strdup(src_user_name);
-	ctx->keyword = g_strdup(keyword);
+	ctx->search_text = g_strdup(search_text);
 	ctx->chat_id = chat_id;
 	return ctx;
 }
@@ -1052,7 +1047,7 @@ static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *component
 		guint chat_id = twitter_get_next_chat_id();
 		PurpleAccount *account = purple_connection_get_account(gc);
 		TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
-				search, search, chat_id);
+				search, chat_id);
 		PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, name);
 		purple_conversation_set_title(conv, search);
 		purple_conversation_set_data(conv, "twitter-chat-context", ctx);
