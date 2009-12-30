@@ -70,21 +70,26 @@ typedef struct
 
 typedef struct
 {
+	TwitterChatType type;
 	PurpleAccount *account;
+	guint timer_handle;
+	guint chat_id;
+} TwitterChatContext;
+
+typedef struct
+{
+	TwitterChatContext base;
+
 	gchar *search_text; /* e.g. N900 */
 	gchar *refresh_url; /* e.g. ?since_id=6276370030&q=n900 */
-	guint chat_id; /* conv chat id */
 
 	long long last_tweet_id;
-	guint timer_handle;
 } TwitterSearchTimeoutContext;
 
 typedef struct
 {
-	PurpleAccount *account;
-	//long long last_tweet_id;
-	guint timer_handle;
-	guint chat_id;
+	TwitterChatContext base;
+	guint timeline_id;
 } TwitterTimelineTimeoutContext;
 
 typedef struct
@@ -905,7 +910,7 @@ static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 	g_return_if_fail(account != NULL);
 	g_return_if_fail(statuses != NULL);
 
-	conv = purple_find_chat(gc, ctx->chat_id);
+	conv = purple_find_chat(gc, ctx->base.chat_id);
 	g_return_if_fail (conv != NULL); //todo: destroy context
 
 	chat = PURPLE_CONV_CHAT(conv);
@@ -1006,9 +1011,9 @@ static void _twitter_search_timeout_context_destory (TwitterSearchTimeoutContext
 	if (!ctx)
 		return ;
 
-	if (ctx->timer_handle) {
-		purple_timeout_remove (ctx->timer_handle);
-		ctx->timer_handle = 0;
+	if (ctx->base.timer_handle) {
+		purple_timeout_remove (ctx->base.timer_handle);
+		ctx->base.timer_handle = 0;
 	}
 	ctx->last_tweet_id = 0;
 
@@ -1058,7 +1063,7 @@ static void twitter_search_cb(PurpleAccount *account,
 	//
 	//TODO DEBUG stuff
 
-	conv = purple_find_chat(gc, ctx->chat_id);
+	conv = purple_find_chat(gc, ctx->base.chat_id);
 	g_return_if_fail (conv != NULL); //destroy context
 
 	chat = PURPLE_CONV_CHAT(conv);
@@ -1103,7 +1108,7 @@ static gboolean twitter_search_timeout(gpointer data)
 		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, refresh_url exists: %s\n",
 				G_STRFUNC, ctx->refresh_url);
 
-		twitter_api_search_refresh(ctx->account, ctx->refresh_url,
+		twitter_api_search_refresh(ctx->base.account, ctx->refresh_url,
 				twitter_search_cb, NULL, ctx);
 	}
 	else {
@@ -1115,7 +1120,7 @@ static gboolean twitter_search_timeout(gpointer data)
 		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, create refresh_url: %s\n",
 				G_STRFUNC, refresh_url);
 
-		twitter_api_search_refresh (ctx->account, refresh_url,
+		twitter_api_search_refresh (ctx->base.account, refresh_url,
 				twitter_search_cb, NULL, ctx);
 
 		g_free (refresh_url);
@@ -1128,9 +1133,10 @@ static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAcc
 		const char *search_text, guint chat_id)
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
-	ctx->account = account;
+	ctx->base.type = TWITTER_CHAT_SEARCH;
+	ctx->base.account = account;
 	ctx->search_text = g_strdup(search_text);
-	ctx->chat_id = chat_id;
+	ctx->base.chat_id = chat_id;
 	return ctx;
 }
 
@@ -1168,9 +1174,9 @@ static void twitter_chat_leave(PurpleConnection *gc, int id) {
 
 	g_hash_table_remove(twitter->search_chat_ids, ctx->search_text);
 
-	if (ctx->timer_handle) {
-		purple_timeout_remove (ctx->timer_handle);
-		ctx->timer_handle = 0;
+	if (ctx->base.timer_handle) {
+		purple_timeout_remove (ctx->base.timer_handle);
+		ctx->base.timer_handle = 0;
 	}
 	_twitter_search_timeout_context_destory(ctx);
 
@@ -1260,7 +1266,7 @@ static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *component
                                 twitter_search_cb, NULL, ctx);
 
 
-                ctx->timer_handle = purple_timeout_add_seconds(
+                ctx->base.timer_handle = purple_timeout_add_seconds(
                                 60 * interval,
                                 twitter_search_timeout, ctx);
         } else {
@@ -1274,12 +1280,13 @@ static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *component
 static gboolean twitter_timeline_timeout(gpointer data)
 {
 	TwitterTimelineTimeoutContext *ctx = (TwitterTimelineTimeoutContext *)data;
-	PurpleConnection *gc = purple_account_get_connection(ctx->account);
+	PurpleAccount *account = ctx->base.account;
+	PurpleConnection *gc = purple_account_get_connection(account);
 	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
 	if (since_id == 0)
 	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", ctx->account->username);
-		twitter_api_get_home_timeline(ctx->account,
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", account->username);
+		twitter_api_get_home_timeline(account,
 				since_id,
 				20,
 				1,
@@ -1287,8 +1294,8 @@ static gboolean twitter_timeline_timeout(gpointer data)
 				NULL,
 				ctx);
 	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", ctx->account->username, since_id);
-		twitter_api_get_home_timeline_all(ctx->account,
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", account->username, since_id);
+		twitter_api_get_home_timeline_all(account,
 				since_id,
 				twitter_get_home_timeline_all_cb,
 				NULL,
@@ -1310,8 +1317,8 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 		PurpleAccount *account = purple_connection_get_account(gc);
 		TwitterTimelineTimeoutContext *ctx = g_new0(TwitterTimelineTimeoutContext, 1);
 		serv_got_joined_chat(gc, chat_id, "Home Timeline");
-		ctx->chat_id = chat_id;
-		ctx->account = account;
+		ctx->base.chat_id = chat_id;
+		ctx->base.account = account;
 
 		g_hash_table_replace(twitter->timeline_chat_ids, g_memdup(&timeline_id, sizeof(timeline_id)), g_memdup(&chat_id, sizeof(chat_id)));
 		long long since_id = twitter_connection_get_last_home_timeline_id(gc);
@@ -1337,7 +1344,7 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 					ctx);
 		}
 		//TODO: I don't think this timer should be here, but for the time being...
-		ctx->timer_handle = purple_timeout_add_seconds(
+		ctx->base.timer_handle = purple_timeout_add_seconds(
 				60 * interval,
 				twitter_timeline_timeout, ctx);
 		/*twitter_api_search(account,
