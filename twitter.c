@@ -118,26 +118,36 @@ typedef struct
 	gboolean requesting;
 } TwitterConnectionData;
 
-
-//TODO: lots of copy and pasting here... let's refactor next
-static long long twitter_account_get_last_home_timeline_id(PurpleAccount *account)
+static long long purple_account_get_long_long(PurpleAccount *account, const gchar *key, long long default_value)
 {
 	const char* tmp_str;
 
-	tmp_str = purple_account_get_string(account, "twitter_last_home_timeline_id", NULL);
+	tmp_str = purple_account_get_string(account, key, NULL);
 	if(tmp_str)
 		return strtoll(tmp_str, NULL, 10);
 	else
 		return 0;
 }
 
-static void twitter_account_set_last_home_timeline_id(PurpleAccount *account, long long reply_id)
+static void purple_account_set_long_long(PurpleAccount *account, const gchar *key, long long value)
 {
 	gchar* tmp_str;
 
-	tmp_str = g_strdup_printf("%lld", reply_id);
-	purple_account_set_string(account, "twitter_last_home_timeline_id", tmp_str);
+	tmp_str = g_strdup_printf("%lld", value);
+	purple_account_set_string(account, key, tmp_str);
 	g_free(tmp_str);
+}
+
+
+//TODO: lots of copy and pasting here... let's refactor next
+static long long twitter_account_get_last_home_timeline_id(PurpleAccount *account)
+{
+	return purple_account_get_long_long(account, "twitter_last_home_timeline_id", 0);
+}
+
+static void twitter_account_set_last_home_timeline_id(PurpleAccount *account, long long reply_id)
+{
+	purple_account_set_long_long(account, "twitter_last_home_timeline_id", reply_id);
 }
 
 static long long twitter_connection_get_last_home_timeline_id(PurpleConnection *gc)
@@ -158,22 +168,12 @@ static void twitter_connection_set_last_home_timeline_id(PurpleConnection *gc, l
 
 static long long twitter_account_get_last_reply_id(PurpleAccount *account)
 {
-	const char* tmp_str;
-
-	tmp_str = purple_account_get_string(account, "twitter_last_reply_id", NULL);
-	if(tmp_str)
-		return strtoll(tmp_str, NULL, 10);
-	else
-		return 0;
+	return purple_account_get_long_long(account, "twitter_last_reply_id", 0);
 }
 
 static void twitter_account_set_last_reply_id(PurpleAccount *account, long long reply_id)
 {
-	gchar* tmp_str;
-
-	tmp_str = g_strdup_printf("%lld", reply_id);
-	purple_account_set_string(account, "twitter_last_reply_id", tmp_str);
-	g_free(tmp_str);
+	purple_account_set_long_long(account, "twitter_last_reply_id", reply_id);
 }
 
 static long long twitter_connection_get_last_reply_id(PurpleConnection *gc)
