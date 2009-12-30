@@ -446,6 +446,43 @@ static PurpleChat *twitter_blist_chat_find_search(PurpleAccount *account, const 
 {
 	return _twitter_blist_chat_find(account, TWITTER_CHAT_SEARCH, "search", name);
 }
+static PurpleChat *twitter_blist_chat_find_timeline(PurpleAccount *account, gint timeline_id)
+{
+	char *tmp = g_strdup_printf("%d", timeline_id);
+	PurpleChat *chat = _twitter_blist_chat_find(account, TWITTER_CHAT_TIMELINE, "timeline_id", tmp);
+	g_free(tmp);
+	return chat;
+}
+
+static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint timeline_id)
+{
+	PurpleGroup *g;
+	PurpleChat *c = twitter_blist_chat_find_timeline(account, timeline_id);
+	GHashTable *components;
+	if (c != NULL)
+	{
+		return c;
+	}
+	g = purple_find_group("twitter");
+	if (g == NULL)
+		g = purple_group_new("twitter");
+
+	components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
+
+	//TODO
+	//bug in pidgin prevents this from working
+	g_hash_table_insert(components, "interval",
+			g_strdup_printf("%d", purple_account_get_int(account,
+					TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT)));
+	g_hash_table_insert(components, "chat_type",
+			g_strdup_printf("%d", TWITTER_CHAT_TIMELINE));
+	g_hash_table_insert(components, "timeline_id",
+			g_strdup_printf("%d", timeline_id));
+
+	c = purple_chat_new(account, "Home Timeline", components);
+	purple_blist_add_chat(c, g, NULL);
+	return c;
+}
 
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
@@ -1475,6 +1512,8 @@ static void twitter_get_friends_verify_connection_cb(PurpleAccount *account,
 		purple_connection_set_state(gc, PURPLE_CONNECTED);
 
 		l_users_data = twitter_users_nodes_parse(nodes);
+
+		twitter_blist_chat_timeline_new(account, 0);
 
 		/* setup buddy list */
 		twitter_buddy_datas_set_all(account, l_users_data);
