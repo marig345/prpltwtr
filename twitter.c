@@ -82,7 +82,7 @@ typedef struct
 typedef struct
 {
 	PurpleAccount *account;
-	long long last_tweet_id;
+	//long long last_tweet_id;
 	guint timer_handle;
 	guint chat_id;
 } TwitterTimelineTimeoutContext;
@@ -1271,6 +1271,33 @@ static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *component
         }
 }
 
+static gboolean twitter_timeline_timeout(gpointer data)
+{
+	TwitterTimelineTimeoutContext *ctx = (TwitterTimelineTimeoutContext *)data;
+	PurpleConnection *gc = purple_account_get_connection(ctx->account);
+	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
+	if (since_id == 0)
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", ctx->account->username);
+		twitter_api_get_home_timeline(ctx->account,
+				since_id,
+				20,
+				1,
+				twitter_get_home_timeline_cb,
+				NULL,
+				ctx);
+	} else {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", ctx->account->username, since_id);
+		twitter_api_get_home_timeline_all(ctx->account,
+				since_id,
+				twitter_get_home_timeline_all_cb,
+				NULL,
+				ctx);
+	}
+
+	return TRUE;
+}
+
 static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *components) {
 	gint timeline_id = 0;
 	int interval = 1;
@@ -1284,6 +1311,7 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 		TwitterTimelineTimeoutContext *ctx = g_new0(TwitterTimelineTimeoutContext, 1);
 		serv_got_joined_chat(gc, chat_id, "Home Timeline");
 		ctx->chat_id = chat_id;
+		ctx->account = account;
 
 		g_hash_table_replace(twitter->timeline_chat_ids, g_memdup(&timeline_id, sizeof(timeline_id)), g_memdup(&chat_id, sizeof(chat_id)));
 		long long since_id = twitter_connection_get_last_home_timeline_id(gc);
@@ -1308,6 +1336,10 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 					NULL,
 					ctx);
 		}
+		//TODO: I don't think this timer should be here, but for the time being...
+		ctx->timer_handle = purple_timeout_add_seconds(
+				60 * interval,
+				twitter_timeline_timeout, ctx);
 		/*twitter_api_search(account,
 				search, ctx->last_tweet_id,
 				TWITTER_SEARCH_RPP_DEFAULT,
