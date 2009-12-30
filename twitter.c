@@ -95,6 +95,7 @@ typedef struct
 	long long last_home_timeline_id;
 	long long failed_get_replies_count;
 
+	//TODO, combine
 	GHashTable *search_chat_ids;
 	GHashTable *timeline_chat_ids;
 	/* key: gchar *screen_name,
@@ -894,21 +895,20 @@ static void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const 
 			time);
 }
 
-static void twitter_get_home_timeline_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
+		TwitterTimelineTimeoutContext *ctx, GList *statuses)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	PurpleConvChat *chat;
-	TwitterTimelineTimeoutContext *ctx = (TwitterTimelineTimeoutContext *)user_data;
 	PurpleConversation *conv;
+	GList *l;
+	g_return_if_fail(account != NULL);
+	g_return_if_fail(statuses != NULL);
 
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 	conv = purple_find_chat(gc, ctx->chat_id);
 	g_return_if_fail (conv != NULL); //todo: destroy context
 
 	chat = PURPLE_CONV_CHAT(conv);
-
-	GList *statuses = twitter_statuses_node_parse(node);
-	GList *l;
 
 	for (l = statuses; l; l = l->next)
 	{
@@ -924,6 +924,12 @@ static void twitter_get_home_timeline_cb(PurpleAccount *account, xmlnode *node, 
 			const char *screen_name = user_data->screen_name;
 			const char *text = status->text;
 			twitter_chat_add_tweet(chat, screen_name, text, time(NULL));
+			if (status->id && status->id > twitter_connection_get_last_home_timeline_id(gc))
+			{
+				twitter_connection_set_last_home_timeline_id(gc, status->id);
+			}
+
+			//if (status->id >
 			//twitter_buddy_set_user_data(account, user_data, FALSE);
 			//twitter_status_data_update_conv(account, screen_name, status, add_link);
 			//twitter_buddy_set_status_data(account, screen_name, status);
@@ -935,56 +941,30 @@ static void twitter_get_home_timeline_cb(PurpleAccount *account, xmlnode *node, 
 			//g_free(screen_name);
 		}
 	}
-	/*twitter_api_get_friends(acct,
-			twitter_get_friends_verify_connection_cb,
-			twitter_get_friends_verify_error_cb,
-			NULL);*/
+}
+
+static void twitter_get_home_timeline_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+{
+	TwitterTimelineTimeoutContext *ctx = (TwitterTimelineTimeoutContext *)user_data;
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+
+	GList *statuses = twitter_statuses_node_parse(node);
+	twitter_get_home_timeline_parse_statuses(account, ctx, statuses);
+	g_list_free(statuses);
+
 }
 
 static void twitter_get_home_timeline_all_cb(PurpleAccount *account,
 		GList *nodes,
 		gpointer user_data)
 {
-	PurpleConnection *gc = purple_account_get_connection(account);
-	PurpleConvChat *chat;
 	TwitterTimelineTimeoutContext *ctx = (TwitterTimelineTimeoutContext *)user_data;
-	PurpleConversation *conv;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-	conv = purple_find_chat(gc, ctx->chat_id);
-	g_return_if_fail (conv != NULL); //todo: destroy context
-
-	chat = PURPLE_CONV_CHAT(conv);
 
 	GList *statuses = twitter_statuses_nodes_parse(nodes);
-	GList *l;
-
-	for (l = statuses; l; l = l->next)
-	{
-		TwitterBuddyData *data = l->data;
-		TwitterStatusData *status = data->status;
-		TwitterUserData *user_data = data->user;
-		g_free(data);
-
-		if (!user_data)
-		{
-			twitter_status_data_free(status);
-		} else {
-			const char *screen_name = user_data->screen_name;
-			const char *text = status->text;
-			twitter_chat_add_tweet(chat, screen_name, text, time(NULL));
-			//twitter_buddy_set_user_data(account, user_data, FALSE);
-			//twitter_status_data_update_conv(account, screen_name, status, add_link);
-			//twitter_buddy_set_status_data(account, screen_name, status);
-
-			/* update user_reply_id_table table */
-			//gchar *reply_id = g_strdup_printf ("%lld", status->id);
-			//g_hash_table_insert (twitter->user_reply_id_table,
-					//g_strdup (screen_name), reply_id);
-			//g_free(screen_name);
-		}
-	}
-
+	twitter_get_home_timeline_parse_statuses(account, ctx, statuses);
 	g_list_free(statuses);
 }
 static void twitter_get_replies_all_cb (PurpleAccount *account,
@@ -1302,7 +1282,7 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 		guint chat_id = twitter_get_next_chat_id();
 		PurpleAccount *account = purple_connection_get_account(gc);
 		TwitterTimelineTimeoutContext *ctx = g_new0(TwitterTimelineTimeoutContext, 1);
-		PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, "Home Timeline");
+		serv_got_joined_chat(gc, chat_id, "Home Timeline");
 		ctx->chat_id = chat_id;
 
 		g_hash_table_replace(twitter->timeline_chat_ids, g_memdup(&timeline_id, sizeof(timeline_id)), g_memdup(&chat_id, sizeof(chat_id)));
