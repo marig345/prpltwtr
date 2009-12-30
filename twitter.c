@@ -68,13 +68,18 @@ typedef struct
 	TwitterUserData *user;
 } TwitterBuddyData;
 
-typedef struct
+typedef struct _TwitterChatContext TwitterChatContext;
+typedef void (*TwitterChatLeaveFunc)(TwitterChatContext *ctx);
+typedef gint (*TwitterChatSendMessageFunc)(TwitterChatContext *ctx, const char *message);
+struct _TwitterChatContext
 {
 	TwitterChatType type;
 	PurpleAccount *account;
 	guint timer_handle;
 	guint chat_id;
-} TwitterChatContext;
+	TwitterChatLeaveFunc leave_cb;
+	TwitterChatSendMessageFunc send_message_cb;
+};
 
 typedef struct
 {
@@ -1005,16 +1010,27 @@ static gboolean twitter_get_replies_timeout (gpointer data)
 /******************************************************
  *  Twitter search
  ******************************************************/
-
-static void _twitter_search_timeout_context_destory (TwitterSearchTimeoutContext *ctx)
+static void _twitter_chat_context_destroy (TwitterChatContext *ctx)
 {
-	if (!ctx)
-		return ;
-
-	if (ctx->base.timer_handle) {
-		purple_timeout_remove (ctx->base.timer_handle);
-		ctx->base.timer_handle = 0;
+	if (ctx->timer_handle)
+	{
+		purple_timeout_remove(ctx->timer_handle);
+		ctx->timer_handle = 0;
 	}
+}
+
+static void twitter_chat_search_leave(TwitterChatContext *ctx_base)
+{
+	PurpleConnection *gc;
+	TwitterSearchTimeoutContext *ctx;
+	g_return_if_fail(ctx_base != NULL);
+	ctx = (TwitterSearchTimeoutContext *) ctx_base;
+	gc = purple_account_get_connection(ctx->base.account);
+	TwitterConnectionData *twitter = gc->proto_data;
+
+	g_hash_table_remove(twitter->search_chat_ids, ctx->search_text);
+	_twitter_chat_context_destroy(&ctx->base);
+
 	ctx->last_tweet_id = 0;
 
 	g_free (ctx->search_text);
@@ -1024,6 +1040,21 @@ static void _twitter_search_timeout_context_destory (TwitterSearchTimeoutContext
 	ctx->refresh_url = NULL;
 
 	g_slice_free (TwitterSearchTimeoutContext, ctx);
+} 
+
+static void twitter_chat_timeline_leave(TwitterChatContext *ctx_base)
+{
+	PurpleConnection *gc;
+	TwitterTimelineTimeoutContext *ctx;
+	g_return_if_fail(ctx_base != NULL);
+	ctx = (TwitterTimelineTimeoutContext *) ctx_base;
+	gc = purple_account_get_connection(ctx->base.account);
+	TwitterConnectionData *twitter = gc->proto_data;
+
+	g_hash_table_remove(twitter->timeline_chat_ids, &ctx->timeline_id);
+	_twitter_chat_context_destroy(&ctx->base);
+
+	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
 
 
@@ -1129,14 +1160,57 @@ static gboolean twitter_search_timeout(gpointer data)
 	return TRUE;
 }
 
+static int twitter_chat_search_send(TwitterChatContext *ctx_base, const gchar *message)
+{
+	PurpleAccount *account = ctx_base->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) ctx_base;
+	PurpleConversation *conv = purple_find_chat(gc, ctx_base->chat_id);
+	char *status;
+	char *message_lower, *search_text_lower;
+
+	if (conv == NULL) return -1; //TODO: error?
+
+	//TODO: verify that we want utf8 case insensitive, and not ascii
+	message_lower = g_utf8_strdown(message, -1);
+	search_text_lower = g_utf8_strdown(ctx->search_text, -1);
+	if (strstr(message_lower, search_text_lower))
+	{
+		status = g_strdup(message);
+	} else {
+		status = g_strdup_printf("%s %s", ctx->search_text, message);
+	}
+	g_free(message_lower);
+	g_free(search_text_lower);
+
+	if (strlen(status) > MAX_TWEET_LENGTH)
+	{
+		//TODO: SHOW ERROR
+		g_free(status);
+		return -1;
+	}
+	else
+	{
+		PurpleAccount *account = purple_connection_get_account(gc);
+		twitter_api_set_status(purple_connection_get_account(gc),
+				status, 0,
+				NULL, NULL,//TODO: verify & error
+				NULL);
+		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, status, time(NULL));//TODO: FIX TIME
+		g_free(status);
+		return 0;
+	}
+}
+
 static void twitter_chat_context_new(TwitterChatContext *ctx,
-	TwitterChatType type, PurpleAccount *account, guint chat_id)
+	TwitterChatType type, PurpleAccount *account, guint chat_id,
+	TwitterChatLeaveFunc leave_cb, TwitterChatSendMessageFunc send_message_cb)
 {
 	ctx->type = type;
 	ctx->account = account;
 	ctx->chat_id = chat_id;
-	//ctx->leave_callback = NULL;
-	//ctx->send_message_callback = NULL;
+	ctx->leave_cb = leave_cb;
+	ctx->send_message_cb = send_message_cb;
 }
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
@@ -1144,7 +1218,8 @@ static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAcc
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 
-	twitter_chat_context_new(&ctx->base, TWITTER_CHAT_SEARCH, account, chat_id);
+	twitter_chat_context_new(&ctx->base, TWITTER_CHAT_SEARCH, account, chat_id,
+			twitter_chat_search_leave, twitter_chat_search_send);
 	ctx->search_text = g_strdup(search_text);
 	return ctx;
 }
@@ -1154,7 +1229,8 @@ static TwitterTimelineTimeoutContext *twitter_timeline_timeout_context_new(Purpl
 {
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
 
-	twitter_chat_context_new(&ctx->base, TWITTER_CHAT_TIMELINE, account, chat_id);
+	twitter_chat_context_new(&ctx->base, TWITTER_CHAT_TIMELINE, account, chat_id,
+			twitter_chat_timeline_leave, NULL);
 	ctx->timeline_id = timeline_id;
 	return ctx;
 }
@@ -1179,72 +1255,24 @@ static void get_saved_searches_cb (PurpleAccount *account,
 
 
 static void twitter_chat_leave(PurpleConnection *gc, int id) {
-	TwitterConnectionData *twitter = gc->proto_data;
 	PurpleConversation *conv = purple_find_chat(gc, id);
-	TwitterChatContext *ctx;
+	TwitterChatContext *ctx = (TwitterChatContext *) purple_conversation_get_data(conv, "twitter-chat-context");
 
-	g_return_if_fail(conv != NULL);
-
-	//TODO: fix this to work with the different types of chats
-	purple_debug_info(TWITTER_PROTOCOL_ID, "delete chat: name %s\n", conv->name);
-
-	ctx = (TwitterChatContext *) purple_conversation_get_data(conv, "twitter-chat-context");
 	g_return_if_fail(ctx != NULL);
 
-
-	if (ctx->timer_handle) {
-		purple_timeout_remove (ctx->timer_handle);
-		ctx->timer_handle = 0;
-	}
-	//TODO handle destroy of different types
-	//g_hash_table_remove(twitter->search_chat_ids, ctx->search_text);
-	//_twitter_search_timeout_context_destory(ctx);
-
+	if (ctx->leave_cb)
+		ctx->leave_cb(ctx);
 }
 static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 		PurpleMessageFlags flags) {
 	PurpleConversation *conv = purple_find_chat(gc, id);
-	const char *chat_name = NULL;
-	char *status;
-	char *message_lower, *chat_name_lower;
+	TwitterChatContext *ctx = (TwitterChatContext *) purple_conversation_get_data(conv, "twitter-chat-context");
 
-	if (conv == NULL) return -1; //TODO: error?
-	chat_name = conv->name;
+	g_return_val_if_fail(ctx != NULL, -1);
 
-	if (chat_name == NULL) return -1; //TODO: error?
-
-	//TODO: check if keyword is already in message
-
-	//TODO: verify that we want utf8 case insensitive, and not ascii
-	message_lower = g_utf8_strup(message, -1);
-	chat_name_lower = g_utf8_strup(chat_name, -1);
-	if (strstr(message_lower, chat_name_lower))
-	{
-		status = g_strdup(message);
-	} else {
-		status = g_strdup_printf("%s %s", chat_name, message);
-	}
-	g_free(message_lower);
-	g_free(chat_name_lower);
-
-	if (strlen(status) > MAX_TWEET_LENGTH)
-	{
-		//TODO: TEST ME!
-		purple_conv_present_error(chat_name, purple_connection_get_account(gc), "Message is too long");
-		g_free(status);
-		return -1;
-	}
-	else
-	{
-		PurpleAccount *account = purple_connection_get_account(gc);
-		twitter_api_set_status(purple_connection_get_account(gc),
-				status, 0,
-				NULL, NULL,//TODO: verify & error
-				NULL);
-		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, status, time(NULL));//TODO: FIX TIME
-		g_free(status);
-		return 0;
-	}
+	if (ctx->send_message_cb)
+		return ctx->send_message_cb(ctx, message);
+	return 0;
 }
 
 static gint twitter_get_next_chat_id()
