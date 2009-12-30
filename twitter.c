@@ -1160,6 +1160,30 @@ static gboolean twitter_search_timeout(gpointer data)
 	return TRUE;
 }
 
+static int twitter_chat_timeline_send(TwitterChatContext *ctx_base, const gchar *message)
+{
+	PurpleAccount *account = ctx_base->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	//TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) ctx_base;
+	PurpleConversation *conv = purple_find_chat(gc, ctx_base->chat_id);
+
+	if (conv == NULL) return -1; //TODO: error?
+
+	if (strlen(message) > MAX_TWEET_LENGTH)
+	{
+		//TODO: SHOW ERROR
+		return -1;
+	}
+	else
+	{
+		twitter_api_set_status(account,
+				message, 0,
+				NULL, NULL,//TODO: verify & error
+				NULL);
+		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, message, time(NULL));//TODO: FIX TIME
+		return 0;
+	}
+}
 static int twitter_chat_search_send(TwitterChatContext *ctx_base, const gchar *message)
 {
 	PurpleAccount *account = ctx_base->account;
@@ -1230,7 +1254,7 @@ static TwitterTimelineTimeoutContext *twitter_timeline_timeout_context_new(Purpl
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
 
 	twitter_chat_context_new(&ctx->base, TWITTER_CHAT_TIMELINE, account, chat_id,
-			twitter_chat_timeline_leave, NULL);
+			twitter_chat_timeline_leave, twitter_chat_timeline_send);
 	ctx->timeline_id = timeline_id;
 	return ctx;
 }
