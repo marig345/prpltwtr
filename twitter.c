@@ -192,9 +192,31 @@ static void twitter_connection_set_last_reply_id(PurpleConnection *gc, long long
 	twitter_account_set_last_reply_id(purple_connection_get_account(gc), reply_id);
 }
 
-//borrowed almost exactly from msn
-//There's still something wrong here...
-//Need to fix this for people who aren't in +0000
+//TODO: this is a bad hack that breaks when we switch timezones (daylight savings, etc)
+static time_t twitter_get_timezone_offset()
+{
+	static long tzoff = PURPLE_NO_TZ_OFF;
+	if (tzoff == PURPLE_NO_TZ_OFF)
+	{
+		struct tm t;
+		time_t tval = 0;
+		const char *tzoff_str;
+		long tzoff_l;
+
+		tzoff = 0;
+
+		time(&tval);
+		localtime_r(&tval, &t);
+		tzoff_str = purple_get_tzoff_str(&t, FALSE);
+		if (tzoff_str && tzoff_str[0] != '\0')
+		{
+			tzoff_l = strtol(tzoff_str, NULL, 10);
+			tzoff = (60 * 60 * (int) (tzoff_l / 100)) +
+				(60 * (tzoff_l % 100));
+		}
+	}
+	return tzoff;
+}
 static time_t twitter_status_parse_timestamp(const char *timestamp)
 {
 	//Sat Mar 07 18:12:10 +0000 2009
@@ -233,28 +255,7 @@ static time_t twitter_status_parse_timestamp(const char *timestamp)
 
 			if (sscanf(tz_ptr, "%02d%02d", &tzhrs, &tzmins) == 2) {
 				time_t tzoff = tzhrs * 60 * 60 + tzmins * 60;
-#ifdef _WIN32
-				long sys_tzoff;
-#endif
-
-				if (offset_positive)
-					tzoff *= -1;
-
-				t.tm_year -= 1900;
-
-#ifdef _WIN32
-				if ((sys_tzoff = wpurple_get_tz_offset()) != -1)
-					tzoff += sys_tzoff;
-#else
-#ifdef HAVE_TM_GMTOFF
-				tzoff += t.tm_gmtoff;
-#else
-#	ifdef HAVE_TIMEZONE
-				tzset();    /* making sure */
-				tzoff -= timezone;
-#	endif
-#endif
-#endif /* _WIN32 */
+				tzoff += twitter_get_timezone_offset();
 
 				return mktime(&t) + tzoff;
 			}
@@ -592,7 +593,7 @@ static void twitter_status_data_update_conv(PurpleAccount *account,
 
 	serv_got_im(gc, src_user,
 			tweet,
-			PURPLE_MESSAGE_RECV, time(NULL)/*s->created_at*/); //TODO: once timestamp parsing is fixed...
+			PURPLE_MESSAGE_RECV, s->created_at);
 
 	g_free (tweet);
 }
@@ -969,7 +970,7 @@ static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 		} else {
 			const char *screen_name = user_data->screen_name;
 			const char *text = status->text;
-			twitter_chat_add_tweet(chat, screen_name, text, time(NULL));
+			twitter_chat_add_tweet(chat, screen_name, text, status->created_at);
 			if (status->id && status->id > twitter_connection_get_last_home_timeline_id(gc))
 			{
 				twitter_connection_set_last_home_timeline_id(gc, status->id);
