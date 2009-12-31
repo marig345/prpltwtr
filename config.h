@@ -10,6 +10,10 @@
 #	include <win32dep.h>
 #endif
 
+#define TWITTER_PREF_DEFAULT_BUDDY_GROUP "twitter"
+#define TWITTER_PREF_DEFAULT_SEARCH_GROUP "twitter searches"
+#define TWITTER_PREF_DEFAULT_TIMELINE_GROUP "twitter timelines"
+
 #define TWITTER_PREF_RETRIEVE_HISTORY "retrieve_tweets_history_after_login"
 #define TWITTER_PREF_RETRIEVE_HISTORY_DEFAULT TRUE
 

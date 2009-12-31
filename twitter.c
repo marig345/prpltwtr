@@ -463,9 +463,9 @@ static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint 
 	{
 		return c;
 	}
-	g = purple_find_group("twitter");
+	g = purple_find_group(TWITTER_PREF_DEFAULT_TIMELINE_GROUP);
 	if (g == NULL)
-		g = purple_group_new("twitter");
+		g = purple_group_new(TWITTER_PREF_DEFAULT_TIMELINE_GROUP);
 
 	components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
 
@@ -492,9 +492,9 @@ static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *se
 	{
 		return c;
 	}
-	g = purple_find_group("twitter");
+	g = purple_find_group(TWITTER_PREF_DEFAULT_SEARCH_GROUP);
 	if (g == NULL)
-		g = purple_group_new("twitter");
+		g = purple_group_new(TWITTER_PREF_DEFAULT_SEARCH_GROUP);
 
 	components = twitter_chat_info_defaults(purple_account_get_connection(account), searchtext);
 
@@ -513,9 +513,9 @@ static PurpleBuddy *twitter_buddy_new(PurpleAccount *account, const char *screen
 		return b;
 	}
 
-	g = purple_find_group("twitter");
+	g = purple_find_group(TWITTER_PREF_DEFAULT_BUDDY_GROUP);
 	if (g == NULL)
-		g = purple_group_new("twitter");
+		g = purple_group_new(TWITTER_PREF_DEFAULT_BUDDY_GROUP);
 	b = purple_buddy_new(account, screenname, alias);
 	purple_blist_add_buddy(b, NULL, g, NULL);
 	b->proto_data = g_new0(TwitterBuddyData, 1);
