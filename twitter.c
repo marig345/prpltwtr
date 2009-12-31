@@ -470,7 +470,6 @@ static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint 
 	components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
 
 	//TODO
-	//bug in pidgin prevents this from working
 	g_hash_table_insert(components, "interval",
 			g_strdup_printf("%d", purple_account_get_int(account,
 					TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT)));
@@ -1415,8 +1414,16 @@ static gboolean twitter_timeline_timeout(gpointer data)
 }
 
 static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *components) {
+        const char *interval_str = g_hash_table_lookup(components, "interval");
 	guint timeline_id = 0;
-	int interval = 1;
+        int interval = 0;
+	//TODO change this to a separate pref
+        int default_interval = purple_account_get_int(purple_connection_get_account(gc),
+                        TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT);
+
+        interval = strtol(interval_str, NULL, 10);
+        if (interval < 1)
+                interval = default_interval;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is joined timeline\n", gc->account->username);
 
