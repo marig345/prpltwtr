@@ -69,6 +69,7 @@ static TwitterSearchData *twitter_search_entry_node_parse(xmlnode *entry_node)
 		}
 
 		entry->text = xmlnode_get_child_data(entry_node, "title");
+		entry->created_at = purple_str_to_time(created_at_str, TRUE, NULL, NULL, NULL); //TODO: test in windows
 
 		g_free(id_str);
 		g_free(created_at_str);

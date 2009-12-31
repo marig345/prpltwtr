@@ -1157,7 +1157,7 @@ static void twitter_search_cb(PurpleAccount *account,
 			tweet = g_strdup(search_data->text);
 		}
 
-		twitter_chat_add_tweet(chat, search_data->from_user, tweet, time(NULL));//TODO: FIX TIME
+		twitter_chat_add_tweet(chat, search_data->from_user, tweet, search_data->created_at);
 
 		g_free (tweet);
 	}
