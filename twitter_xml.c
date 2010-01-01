@@ -194,7 +194,7 @@ GList *twitter_statuses_nodes_parse(GList *nodes)
 	for (l = nodes; l; l = l->next)
 	{
 		xmlnode *node = l->data;
-		l_users_data = g_list_concat(twitter_statuses_node_parse(node), l_users_data);
+		l_users_data = g_list_concat(l_users_data, twitter_statuses_node_parse(node));
 	}
 	return l_users_data;
 }
