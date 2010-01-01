@@ -30,8 +30,7 @@ LIBS =	-lgtk-win32-2.0 \
 			-lgdk-win32-2.0 \
 			-lgobject-2.0 \
 			-lintl \
-			-lpurple \
-			-lpidgin
+			-lpurple
 CFLAGS := $(PURPLE_CFLAGS) $(TWITTER_INC_PATHS)
 else
 CFLAGS := $(PURPLE_CFLAGS) $(PIDGIN_CFLAGS)
