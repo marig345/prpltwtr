@@ -701,14 +701,22 @@ static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account
 
 static void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *message, time_t time)
 {
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+	g_return_if_fail(chat != NULL);
+	g_return_if_fail(who != NULL);
+	g_return_if_fail(message != NULL);
 	if (!purple_conv_chat_find_user(chat, who))
 	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "added %s to chat %s\n",
+				who,
+				purple_conversation_get_name(purple_conv_chat_get_conversation(chat)));
 		purple_conv_chat_add_user(chat,
 				who,
 				NULL,   /* user-provided join message, IRC style */
 				PURPLE_CBFLAGS_NONE,
 				FALSE);  /* show a join message */
 	}
+	purple_debug_info(TWITTER_PROTOCOL_ID, "message %s\n", message);
 	serv_got_chat_in(purple_conversation_get_gc(purple_conv_chat_get_conversation(chat)),
 			purple_conv_chat_get_id(chat),
 			who,
@@ -724,8 +732,12 @@ static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 	PurpleConvChat *chat;
 	PurpleConversation *conv;
 	GList *l;
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+
 	g_return_if_fail(account != NULL);
 	g_return_if_fail(statuses != NULL);
+
 
 	conv = purple_find_chat(gc, ctx->base.chat_id);
 	g_return_if_fail (conv != NULL); //todo: destroy context
@@ -1308,7 +1320,7 @@ static void twitter_get_friends_verify_connection_cb(PurpleAccount *account,
 		/* We want to retrieve all mentions/replies since
 		 * last reply we have retrieved and stored locally */
 		twitter_connection_set_last_reply_id(gc,
-				twitter_account_get_last_reply_id (account));
+				twitter_account_get_last_reply_id(account));
 
 		/* Immediately retrieve replies */
 		twitter->requesting = TRUE;
