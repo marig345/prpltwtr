@@ -54,3 +54,4 @@
 #include "twitter_search.h"
 #include "twitter_api.h"
 #include "twitter_util.h"
+#include "twitter_xml.h"

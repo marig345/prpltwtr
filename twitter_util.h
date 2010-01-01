@@ -9,10 +9,6 @@
 #include <glib.h>
 #include <xmlnode.h>
 
-#define SEARCH_PREFIX "#"
-
-gchar *get_search_keyword (const gchar *name);
-
 gchar *xmlnode_get_child_data(const xmlnode *node, const char *name);
 
 #endif /* UTIL_H_ */
