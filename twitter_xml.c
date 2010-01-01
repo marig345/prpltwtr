@@ -62,9 +62,12 @@ static time_t twitter_status_parse_timestamp(const char *timestamp)
 
 			if (sscanf(tz_ptr, "%02d%02d", &tzhrs, &tzmins) == 2) {
 				time_t tzoff = tzhrs * 60 * 60 + tzmins * 60;
+				time_t returned_time;
 				tzoff += twitter_get_timezone_offset();
 
-				return mktime(&t) + tzoff;
+				returned_time = mktime(&t) + tzoff;
+				if (returned_time > 0)
+					return returned_time;
 			}
 		}
 	}
