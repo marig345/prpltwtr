@@ -60,6 +60,8 @@ static time_t twitter_status_parse_timestamp(const char *timestamp)
 				tz_ptr++;
 			}
 
+			t.tm_year -= 1900;
+
 			if (sscanf(tz_ptr, "%02d%02d", &tzhrs, &tzmins) == 2) {
 				time_t tzoff = tzhrs * 60 * 60 + tzmins * 60;
 				time_t returned_time;
