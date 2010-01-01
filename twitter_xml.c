@@ -65,9 +65,9 @@ static time_t twitter_status_parse_timestamp(const char *timestamp)
 				time_t returned_time;
 				tzoff += twitter_get_timezone_offset();
 
-				returned_time = mktime(&t) + tzoff;
-				if (returned_time > 0)
-					return returned_time;
+				returned_time = mktime(&t);
+				if (returned_time != -1 && returned_time != 0)
+					return returned_time + tzoff;
 			}
 		}
 	}
