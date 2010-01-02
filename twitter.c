@@ -468,7 +468,7 @@ static const char *_find_first_delimiter(const char *text, const char *delimiter
 }
 #endif
 
-static const char *twitter_linkify(const char *message)
+static const char *twitter_linkify(PurpleAccount *account, const char *message)
 {
 #if _HAVE_PIDGIN_
 	GString *ret;
@@ -507,8 +507,9 @@ static const char *twitter_linkify(const char *message)
 		if (delim == NULL)
 			delim = end;
 		link_text = g_strndup(ptr, delim - ptr);
-		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///%s?text=%s\">%s</a>",
+		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///%s?account=%s&text=%s\">%s</a>",
 				current_action,
+				purple_account_get_username(account),
 				purple_url_encode(link_text),
 				purple_markup_escape_text(link_text, -1));
 		ptr = delim;
@@ -522,7 +523,7 @@ static const char *twitter_linkify(const char *message)
 
 static char *twitter_format_tweet(PurpleAccount *account, const char *src_user, const char *message, long long id)
 {
-	const char *linkified_message = twitter_linkify(message);
+	const char *linkified_message = twitter_linkify(account, message);
 	gboolean add_link = purple_account_get_bool(account,
 			TWITTER_PREF_ADD_URL_TO_TWEET,
 			TWITTER_PREF_ADD_URL_TO_TWEET_DEFAULT);
@@ -2165,11 +2166,46 @@ static PurplePluginProtocolInfo prpl_info =
 #if _HAVE_PIDGIN_
 static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHashTable *params)
 {
+	char *text;
+	char *username;
+	PurpleAccount *account;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s PROTO %s CMD_ARG %s\n", G_STRFUNC, proto, cmd_arg);
-	if (proto && !strcmp(proto, TWITTER_URI))
-		return TRUE;
-	else
+
+	g_return_val_if_fail(proto != NULL, FALSE);
+	g_return_val_if_fail(cmd_arg != NULL, FALSE);
+
+	//don't handle someone elses proto
+	if (strcmp(proto, TWITTER_URI))
 		return FALSE;
+
+	text = g_hash_table_lookup(params, "text");
+	username = g_hash_table_lookup(params, "account");
+
+	if (text == NULL || username == NULL)
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "malformed uri.\n");
+		return FALSE;
+	}
+
+	account = purple_accounts_find(username, TWITTER_PROTOCOL_ID);
+
+	if (account == NULL)
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "could not find account %s\n", username);
+		return FALSE;
+	}
+
+	while (cmd_arg[0] == '/')
+		cmd_arg++;
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Account %s got action %s with text %s\n", username, cmd_arg, text);
+	if (!strcmp(cmd_arg, "im"))
+	{
+		//im
+	} else if (!strcmp(cmd_arg, "search")) {
+		//search
+	}
+	return TRUE;
 }
 
 static gboolean twitter_url_clicked_cb(GtkIMHtml *imhtml, GtkIMHtmlLink *link)
