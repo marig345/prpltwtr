@@ -453,15 +453,31 @@ static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData 
 	twitter_buddy_update_icon(b);
 }
 
+#if _HAVE_PIDGIN_
+static const char *_find_first_delimiter(const char *text, const char *delimiters)
+{
+	const char *delimiter;
+	const char *first = NULL;
+	for (delimiter = delimiters; *delimiter != '\0'; delimiter++)
+	{
+		char *pos = strchr(text, *delimiter);
+		if (pos && (first == NULL || pos < first))
+			first = pos;
+	}
+	return first;
+}
+#endif
+
 static const char *twitter_linkify(const char *message)
 {
 #if _HAVE_PIDGIN_
 	GString *ret;
 	static char *matrix[]  = {"#", "search", "@", "im", NULL, NULL};
+	static char delims[] = " :"; //I don't know if this is how I want to do this...
 	char **token, **action;
 	const char *ptr = message;
 	const char *end = message + strlen(message);
-	const char *space = NULL;
+	const char *delim = NULL;
 	g_return_val_if_fail(message != NULL, NULL);
 
 	ret = g_string_new("");
@@ -487,13 +503,13 @@ static const char *twitter_linkify(const char *message)
 		}
 		g_string_append_len(ret, ptr, first_token - ptr);
 		ptr = first_token;
-		space = strstr(ptr, " ");
-		if (space == NULL)
-			space = end;
+		delim = _find_first_delimiter(ptr, delims);
+		if (delim == NULL)
+			delim = end;
 		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///action=%s", current_action);
-		link_text = g_strndup(ptr, space - ptr);
+		link_text = g_strndup(ptr, delim - ptr);
 		g_string_append_printf(ret, "&text=%s\">%s</a>", purple_url_encode(link_text), purple_markup_escape_text(link_text, -1));
-		ptr = space;
+		ptr = delim;
 	}
 
 	return g_string_free(ret, FALSE);
