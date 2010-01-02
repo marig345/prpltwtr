@@ -25,6 +25,8 @@
 #include <glib/gstdio.h>
 
 #include "twitter.h"
+#include <gtkconv.h>
+#include <gtkimhtml.h>
 
 static PurplePlugin *_twitter_protocol = NULL;
 
@@ -448,20 +450,69 @@ static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData 
 	twitter_buddy_update_icon(b);
 }
 
+static char *twitter_linkify(const char *message)
+{
+	GString *ret;
+	static char *matrix[]  = {"#", "search", "@", "im", NULL, NULL};
+	char **token, **action;
+	const char *ptr = message;
+	const char *end = message + strlen(message);
+	const char *space = NULL;
+	g_return_val_if_fail(message != NULL, NULL);
+
+	ret = g_string_new("");
+
+	while (ptr != NULL && ptr < end)
+	{
+		char *first_token = NULL;
+		char *current_action = NULL;
+		char *link_text = NULL;
+		for (token = matrix, action = matrix+1; *token && *action; token += 2, action +=2)
+		{
+			char *next_token = strstr(ptr, *token);
+			if (next_token != NULL && (first_token == NULL || next_token < first_token))
+			{
+				first_token = next_token;
+				current_action = *action;
+			}
+		}
+		if (first_token == NULL)
+		{
+			g_string_append(ret, ptr);
+			break;
+		}
+		g_string_append_len(ret, ptr, first_token - ptr);
+		ptr = first_token;
+		space = strstr(ptr, " ");
+		if (space == NULL)
+			space = end;
+		g_string_append_printf(ret, "<a href=\"putter:///action=%s", current_action);
+		link_text = g_strndup(ptr, space - ptr);
+		g_string_append_printf(ret, "&text=%s\">%s</a>", purple_url_encode(link_text), purple_markup_escape_text(link_text, -1));
+		ptr = space;
+	}
+
+	return g_string_free(ret, FALSE);
+}
+
 static char *twitter_format_tweet(PurpleAccount *account, const char *src_user, const char *message, long long id)
 {
+	char *linkified_message = twitter_linkify(message);
 	gboolean add_link = purple_account_get_bool(account,
 			TWITTER_PREF_ADD_URL_TO_TWEET,
 			TWITTER_PREF_ADD_URL_TO_TWEET_DEFAULT);
 
+	g_return_val_if_fail(linkified_message != NULL, NULL);
+	g_return_val_if_fail(src_user != NULL, NULL);
+
 	if (add_link && id) {
 		return g_strdup_printf("%s\nhttp://twitter.com/%s/status/%lld\n",
-				message,
+				linkified_message,
 				src_user,
 				id);
 	}
 	else {
-		return g_strdup_printf("%s", message);
+		return g_strdup_printf("%s", linkified_message);
 	}
 }
 
@@ -487,7 +538,8 @@ static void twitter_status_data_update_conv(PurpleAccount *account,
 
 	serv_got_im(gc, src_user,
 			tweet,
-			PURPLE_MESSAGE_RECV, s->created_at);
+			PURPLE_MESSAGE_RECV,
+			s->created_at);
 
 	g_free(tweet);
 }
@@ -2085,8 +2137,34 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL
 };
 
+static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHashTable *params)
+{
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s PROTO %s CMD_ARG %s\n", G_STRFUNC, proto, cmd_arg);
+	if (proto && !strcmp(proto, "putter"))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+static gboolean twitter_url_clicked_cb(GtkIMHtml *imhtml, GtkIMHtmlLink *link)
+{
+	const gchar *url = gtk_imhtml_link_get_url(link);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+	purple_got_protocol_handler_uri(url);
+
+	return TRUE;
+}
+
+static gboolean twitter_context_menu(GtkIMHtml *imhtml, GtkIMHtmlLink *link, GtkWidget *menu)
+{
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+	return TRUE;
+}
+
+
 static void twitter_init(PurplePlugin *plugin)
 {
+
 	PurpleAccountOption *option;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "starting up\n");
 
@@ -2153,6 +2231,12 @@ static void twitter_init(PurplePlugin *plugin)
 			TWITTER_PREF_SEARCH_TIMEOUT,                         /* pref name */
 			TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT);                        /* default value */
 	prpl_info.protocol_options = g_list_append(prpl_info.protocol_options, option);
+
+	purple_signal_connect(purple_get_core(), "uri-handler", plugin,
+			PURPLE_CALLBACK(twitter_uri_handler), NULL);
+
+	gtk_imhtml_class_register_protocol("putter://", twitter_url_clicked_cb, twitter_context_menu);
+
 
 
 	_twitter_protocol = plugin;
