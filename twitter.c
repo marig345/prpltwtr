@@ -25,8 +25,11 @@
 #include <glib/gstdio.h>
 
 #include "twitter.h"
+
+#if _HAVE_PIDGIN_
 #include <gtkconv.h>
 #include <gtkimhtml.h>
+#endif
 
 static PurplePlugin *_twitter_protocol = NULL;
 
@@ -450,8 +453,9 @@ static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData 
 	twitter_buddy_update_icon(b);
 }
 
-static char *twitter_linkify(const char *message)
+static const char *twitter_linkify(const char *message)
 {
+#if _HAVE_PIDGIN_
 	GString *ret;
 	static char *matrix[]  = {"#", "search", "@", "im", NULL, NULL};
 	char **token, **action;
@@ -493,11 +497,14 @@ static char *twitter_linkify(const char *message)
 	}
 
 	return g_string_free(ret, FALSE);
+#else
+	return message;
+#endif
 }
 
 static char *twitter_format_tweet(PurpleAccount *account, const char *src_user, const char *message, long long id)
 {
-	char *linkified_message = twitter_linkify(message);
+	const char *linkified_message = twitter_linkify(message);
 	gboolean add_link = purple_account_get_bool(account,
 			TWITTER_PREF_ADD_URL_TO_TWEET,
 			TWITTER_PREF_ADD_URL_TO_TWEET_DEFAULT);
@@ -2137,6 +2144,7 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL
 };
 
+#if _HAVE_PIDGIN_
 static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHashTable *params)
 {
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s PROTO %s CMD_ARG %s\n", G_STRFUNC, proto, cmd_arg);
@@ -2160,6 +2168,7 @@ static gboolean twitter_context_menu(GtkIMHtml *imhtml, GtkIMHtmlLink *link, Gtk
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 	return TRUE;
 }
+#endif
 
 
 static void twitter_init(PurplePlugin *plugin)
@@ -2232,10 +2241,12 @@ static void twitter_init(PurplePlugin *plugin)
 			TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT);                        /* default value */
 	prpl_info.protocol_options = g_list_append(prpl_info.protocol_options, option);
 
+#if _HAVE_PIDGIN_
 	purple_signal_connect(purple_get_core(), "uri-handler", plugin,
 			PURPLE_CALLBACK(twitter_uri_handler), NULL);
 
 	gtk_imhtml_class_register_protocol("putter://", twitter_url_clicked_cb, twitter_context_menu);
+#endif
 
 
 
