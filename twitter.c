@@ -38,6 +38,9 @@ static PurplePlugin *_twitter_protocol = NULL;
 
 #define MAX_TWEET_LENGTH 140
 
+#define TWITTER_URI_ACTION_USER		"user"
+#define TWITTER_URI_ACTION_SEARCH	"search"
+
 typedef enum
 {
 	TWITTER_CHAT_SEARCH = 0,
@@ -475,7 +478,7 @@ static const char *twitter_linkify(PurpleAccount *account, const char *message)
 {
 #if _HAVE_PIDGIN_
 	GString *ret;
-	static char *matrix[]  = {"#", "search", "@", "im", NULL, NULL};
+	static char *matrix[]  = {"#", TWITTER_URI_ACTION_SEARCH, "@", TWITTER_URI_ACTION_USER, NULL, NULL};
 	static char delims[] = " :"; //I don't know if this is how I want to do this...
 	char **token, **action;
 	const char *ptr = message;
@@ -2207,10 +2210,13 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 		cmd_arg++;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "Account %s got action %s with text %s\n", username, cmd_arg, text);
-	if (!strcmp(cmd_arg, "im"))
+	if (!strcmp(cmd_arg, TWITTER_URI_ACTION_USER))
 	{
-		//im
-	} else if (!strcmp(cmd_arg, "search")) {
+		purple_notify_info(purple_account_get_connection(account),
+				"Clicked URI",
+				"@name clicked",
+				"Sorry, this has not been implemented yet");
+	} else if (!strcmp(cmd_arg, TWITTER_URI_ACTION_SEARCH)) {
 		twitter_chat_search_join(purple_account_get_connection(account), text, 0);
 	}
 	return TRUE;
