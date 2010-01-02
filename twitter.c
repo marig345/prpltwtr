@@ -1191,18 +1191,15 @@ static gint twitter_get_next_chat_id()
 	return chat_id++;
 }
 
-static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *components) {
-        const char *search = g_hash_table_lookup(components, "search");
-        const char *interval_str = g_hash_table_lookup(components, "interval");
-        int interval = 0;
+static void twitter_chat_search_join(PurpleConnection *gc, const char *search, int interval)
+{
         int default_interval = purple_account_get_int(purple_connection_get_account(gc),
                         TWITTER_PREF_SEARCH_TIMEOUT, TWITTER_PREF_SEARCH_TIMEOUT_DEFAULT);
 
-        purple_debug_info(TWITTER_PROTOCOL_ID, "%s is performing search %s\n", gc->account->username, search);
-
         g_return_if_fail(search != NULL);
 
-        interval = strtol(interval_str, NULL, 10);
+        purple_debug_info(TWITTER_PROTOCOL_ID, "%s is performing search %s\n", gc->account->username, search);
+
         if (interval < 1)
                 interval = default_interval;
 
@@ -1233,6 +1230,14 @@ static void twitter_chat_search_join(PurpleConnection *gc, GHashTable *component
                 purple_notify_info(gc, "Perform Search", "Perform Search", tmp);
                 g_free(tmp);
         }
+}
+static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable *components) {
+        const char *search = g_hash_table_lookup(components, "search");
+        const char *interval_str = g_hash_table_lookup(components, "interval");
+        int interval = 0;
+
+        interval = interval_str == NULL ? 0 : strtol(interval_str, NULL, 10);
+	twitter_chat_search_join(gc, search, interval);
 }
 
 static gboolean twitter_timeline_timeout(gpointer data)
@@ -1342,7 +1347,7 @@ static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 	switch (conv_type)
 	{
 		case TWITTER_CHAT_SEARCH:
-			twitter_chat_search_join(gc, components);
+			twitter_chat_search_join_components(gc, components);
 			break;
 		case TWITTER_CHAT_TIMELINE:
 			twitter_chat_timeline_join(gc, components);
@@ -2166,8 +2171,8 @@ static PurplePluginProtocolInfo prpl_info =
 #if _HAVE_PIDGIN_
 static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHashTable *params)
 {
-	char *text;
-	char *username;
+	const char *text;
+	const char *username;
 	PurpleAccount *account;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s PROTO %s CMD_ARG %s\n", G_STRFUNC, proto, cmd_arg);
 
@@ -2178,7 +2183,7 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 	if (strcmp(proto, TWITTER_URI))
 		return FALSE;
 
-	text = g_hash_table_lookup(params, "text");
+	text = purple_url_decode(g_hash_table_lookup(params, "text"));
 	username = g_hash_table_lookup(params, "account");
 
 	if (text == NULL || username == NULL)
@@ -2203,7 +2208,7 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 	{
 		//im
 	} else if (!strcmp(cmd_arg, "search")) {
-		//search
+		twitter_chat_search_join(purple_account_get_connection(account), text, 0);
 	}
 	return TRUE;
 }
