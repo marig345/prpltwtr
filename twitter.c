@@ -506,9 +506,11 @@ static const char *twitter_linkify(const char *message)
 		delim = _find_first_delimiter(ptr, delims);
 		if (delim == NULL)
 			delim = end;
-		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///action=%s", current_action);
 		link_text = g_strndup(ptr, delim - ptr);
-		g_string_append_printf(ret, "&text=%s\">%s</a>", purple_url_encode(link_text), purple_markup_escape_text(link_text, -1));
+		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///%s?text=%s\">%s</a>",
+				current_action,
+				purple_url_encode(link_text),
+				purple_markup_escape_text(link_text, -1));
 		ptr = delim;
 	}
 
