@@ -457,14 +457,17 @@ static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData 
 static const char *_find_first_delimiter(const char *text, const char *delimiters)
 {
 	const char *delimiter;
-	const char *first = NULL;
-	for (delimiter = delimiters; *delimiter != '\0'; delimiter++)
+	if (text == NULL || text[0] == '\0')
+		return NULL;
+	do
 	{
-		char *pos = strchr(text, *delimiter);
-		if (pos && (first == NULL || pos < first))
-			first = pos;
-	}
-	return first;
+		for (delimiter = delimiters; *delimiter != '\0'; delimiter++)
+		{
+			if (*text == *delimiter)
+				return text;
+		}
+	} while (++text != '\0');
+	return NULL;
 }
 #endif
 
