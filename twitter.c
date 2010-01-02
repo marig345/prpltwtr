@@ -490,7 +490,7 @@ static const char *twitter_linkify(const char *message)
 		space = strstr(ptr, " ");
 		if (space == NULL)
 			space = end;
-		g_string_append_printf(ret, "<a href=\"putter:///action=%s", current_action);
+		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///action=%s", current_action);
 		link_text = g_strndup(ptr, space - ptr);
 		g_string_append_printf(ret, "&text=%s\">%s</a>", purple_url_encode(link_text), purple_markup_escape_text(link_text, -1));
 		ptr = space;
@@ -2148,7 +2148,7 @@ static PurplePluginProtocolInfo prpl_info =
 static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHashTable *params)
 {
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s PROTO %s CMD_ARG %s\n", G_STRFUNC, proto, cmd_arg);
-	if (proto && !strcmp(proto, "putter"))
+	if (proto && !strcmp(proto, TWITTER_URI))
 		return TRUE;
 	else
 		return FALSE;
@@ -2245,7 +2245,7 @@ static void twitter_init(PurplePlugin *plugin)
 	purple_signal_connect(purple_get_core(), "uri-handler", plugin,
 			PURPLE_CALLBACK(twitter_uri_handler), NULL);
 
-	gtk_imhtml_class_register_protocol("putter://", twitter_url_clicked_cb, twitter_context_menu);
+	gtk_imhtml_class_register_protocol(TWITTER_URI "://", twitter_url_clicked_cb, twitter_context_menu);
 #endif
 
 
