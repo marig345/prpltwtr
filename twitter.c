@@ -457,7 +457,7 @@ static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData 
 }
 
 #if _HAVE_PIDGIN_
-static const char *_find_first_delimiter(const char *text, const char *delimiters)
+static const char *_find_first_delimiter(const char *text, const char *delimiters, int *delim_id)
 {
 	const char *delimiter;
 	if (text == NULL || text[0] == '\0')
@@ -467,9 +467,13 @@ static const char *_find_first_delimiter(const char *text, const char *delimiter
 		for (delimiter = delimiters; *delimiter != '\0'; delimiter++)
 		{
 			if (*text == *delimiter)
+			{
+				if (delim_id != NULL)
+					*delim_id = delimiter - delimiters;
 				return text;
+			}
 		}
-	} while (++text != '\0');
+	} while (*++text != '\0');
 	return NULL;
 }
 #endif
@@ -478,9 +482,9 @@ static const char *twitter_linkify(PurpleAccount *account, const char *message)
 {
 #if _HAVE_PIDGIN_
 	GString *ret;
-	static char *matrix[]  = {"#", TWITTER_URI_ACTION_SEARCH, "@", TWITTER_URI_ACTION_USER, NULL, NULL};
+	static char symbols[] = "#@";
+	static char *symbol_actions[] = {TWITTER_URI_ACTION_SEARCH, TWITTER_URI_ACTION_USER};
 	static char delims[] = " :"; //I don't know if this is how I want to do this...
-	char **token, **action;
 	const char *ptr = message;
 	const char *end = message + strlen(message);
 	const char *delim = NULL;
@@ -490,26 +494,20 @@ static const char *twitter_linkify(PurpleAccount *account, const char *message)
 
 	while (ptr != NULL && ptr < end)
 	{
-		char *first_token = NULL;
+		const char *first_token = NULL;
 		char *current_action = NULL;
 		char *link_text = NULL;
-		for (token = matrix, action = matrix+1; *token && *action; token += 2, action +=2)
-		{
-			char *next_token = strstr(ptr, *token);
-			if (next_token != NULL && (first_token == NULL || next_token < first_token))
-			{
-				first_token = next_token;
-				current_action = *action;
-			}
-		}
+		int symbol_index = 0;
+		first_token = _find_first_delimiter(ptr, symbols, &symbol_index);
 		if (first_token == NULL)
 		{
 			g_string_append(ret, ptr);
 			break;
 		}
+		current_action = symbol_actions[symbol_index];
 		g_string_append_len(ret, ptr, first_token - ptr);
 		ptr = first_token;
-		delim = _find_first_delimiter(ptr, delims);
+		delim = _find_first_delimiter(ptr, delims, NULL);
 		if (delim == NULL)
 			delim = end;
 		link_text = g_strndup(ptr, delim - ptr);
