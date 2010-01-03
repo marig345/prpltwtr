@@ -1367,53 +1367,60 @@ static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 }
 
 
+static void twitter_connected(PurpleAccount *account)
+{
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
+
+	purple_connection_update_progress(gc, "Connected",
+			2,   /* which connection step this is */
+			3);  /* total number of steps */
+	purple_connection_set_state(gc, PURPLE_CONNECTED);
+
+	twitter_blist_chat_timeline_new(account, 0);
+
+	/* Retrieve user's saved search queries */
+	twitter_api_get_saved_searches (account,
+			get_saved_searches_cb, NULL, NULL);
+
+	/* We want to retrieve all mentions/replies since
+	 * last reply we have retrieved and stored locally */
+	twitter_connection_set_last_reply_id(gc,
+			twitter_account_get_last_reply_id(account));
+
+	/* Immediately retrieve replies */
+	twitter->requesting = TRUE;
+	twitter_api_get_replies (account,
+			twitter_connection_get_last_reply_id(purple_account_get_connection(account)),
+			TWITTER_INITIAL_REPLIES_COUNT, 1,
+			twitter_get_replies_cb,
+			twitter_get_replies_timeout_error_cb,
+			NULL);
+
+	/* Install periodic timers to retrieve replies and friend list */
+	twitter->get_replies_timer = purple_timeout_add_seconds(
+			60 * purple_account_get_int(account, TWITTER_PREF_REPLIES_TIMEOUT, TWITTER_PREF_REPLIES_TIMEOUT_DEFAULT),
+			twitter_get_replies_timeout, account);
+	twitter->get_friends_timer = purple_timeout_add_seconds(
+			60 * purple_account_get_int(account, TWITTER_PREF_USER_STATUS_TIMEOUT, TWITTER_PREF_USER_STATUS_TIMEOUT_DEFAULT),
+			twitter_get_friends_timeout, account);
+}
 static void twitter_get_friends_verify_connection_cb(PurpleAccount *account,
 		GList *nodes,
 		gpointer user_data)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterConnectionData *twitter = gc->proto_data;
 	GList *l_users_data = NULL;
 
 	if (purple_connection_get_state(gc) == PURPLE_CONNECTING)
 	{
-		purple_connection_update_progress(gc, "Connected",
-				2,   /* which connection step this is */
-				3);  /* total number of steps */
-		purple_connection_set_state(gc, PURPLE_CONNECTED);
+		twitter_connected(account);
 
 		l_users_data = twitter_users_nodes_parse(nodes);
-
-		twitter_blist_chat_timeline_new(account, 0);
 
 		/* setup buddy list */
 		twitter_buddy_datas_set_all(account, l_users_data);
 
-		/* Retrieve user's saved search queries */
-		twitter_api_get_saved_searches (account,
-				get_saved_searches_cb, NULL, NULL);
-
-		/* We want to retrieve all mentions/replies since
-		 * last reply we have retrieved and stored locally */
-		twitter_connection_set_last_reply_id(gc,
-				twitter_account_get_last_reply_id(account));
-
-		/* Immediately retrieve replies */
-		twitter->requesting = TRUE;
-		twitter_api_get_replies (account,
-				twitter_connection_get_last_reply_id(purple_account_get_connection(account)),
-				TWITTER_INITIAL_REPLIES_COUNT, 1,
-				twitter_get_replies_cb,
-				twitter_get_replies_timeout_error_cb,
-				NULL);
-
-		/* Install periodic timers to retrieve replies and friend list */
-		twitter->get_replies_timer = purple_timeout_add_seconds(
-				60 * purple_account_get_int(account, TWITTER_PREF_REPLIES_TIMEOUT, TWITTER_PREF_REPLIES_TIMEOUT_DEFAULT),
-				twitter_get_replies_timeout, account);
-		twitter->get_friends_timer = purple_timeout_add_seconds(
-				60 * purple_account_get_int(account, TWITTER_PREF_USER_STATUS_TIMEOUT, TWITTER_PREF_USER_STATUS_TIMEOUT_DEFAULT),
-				twitter_get_friends_timeout, account);
 	}
 }
 
@@ -1690,10 +1697,17 @@ static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, xmlnod
 				3);  /* total number of steps */
 
 	}
-	twitter_api_get_friends(acct,
-			twitter_get_friends_verify_connection_cb,
-			twitter_get_friends_verify_error_cb,
-			NULL);
+
+	if (purple_account_get_bool(acct, TWITTER_PREF_GET_FRIENDS,
+				TWITTER_PREF_GET_FRIENDS_DEFAULT))
+	{
+		twitter_api_get_friends(acct,
+				twitter_get_friends_verify_connection_cb,
+				twitter_get_friends_verify_error_cb,
+				NULL);
+	} else {
+		twitter_connected(acct);
+	}
 }
 
 static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
@@ -1725,10 +1739,16 @@ static void twitter_verify_connection(PurpleAccount *acct)
 					3);  /* total number of steps */
 		}
 
-		twitter_api_get_friends(acct,
-				twitter_get_friends_verify_connection_cb,
-				twitter_get_friends_verify_error_cb,
-				NULL);
+		if (purple_account_get_bool(acct, TWITTER_PREF_GET_FRIENDS,
+					TWITTER_PREF_GET_FRIENDS_DEFAULT))
+		{
+			twitter_api_get_friends(acct,
+					twitter_get_friends_verify_connection_cb,
+					twitter_get_friends_verify_error_cb,
+					NULL);
+		} else {
+			twitter_connected(acct);
+		}
 	}
 	else {
 		/* Simply get the last reply */
