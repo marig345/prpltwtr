@@ -1067,7 +1067,7 @@ static int twitter_chat_timeline_send(TwitterChatContext *ctx_base, const gchar 
 	if (strlen(message) > MAX_TWEET_LENGTH)
 	{
 		//TODO: SHOW ERROR
-		return -1;
+		return -E2BIG;
 	}
 	else
 	{
@@ -1106,7 +1106,7 @@ static int twitter_chat_search_send(TwitterChatContext *ctx_base, const gchar *m
 	{
 		//TODO: SHOW ERROR
 		g_free(status);
-		return -1;
+		return -E2BIG;
 	}
 	else
 	{
@@ -1862,7 +1862,7 @@ static int twitter_send_dm(PurpleConnection *gc, const char *who,
 	if (strlen(message) > MAX_TWEET_LENGTH)
 	{
 		purple_conv_present_error(who, purple_connection_get_account(gc), "Message is too long");
-		return 0;
+		return -E2BIG;
 	}
 	else
 	{
@@ -1880,8 +1880,7 @@ static int twitter_send_im(PurpleConnection *gc, const char *who,
 	/* TODO should truncate it rather than drop it????? */
 	if (strlen(who) + strlen(message) + 2 > MAX_TWEET_LENGTH)
 	{
-		purple_conv_present_error(who, purple_connection_get_account(gc), "Message is too long");
-		return 0;
+		return -E2BIG;
 	}
 	else
 	{
