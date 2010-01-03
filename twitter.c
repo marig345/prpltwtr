@@ -2269,6 +2269,13 @@ static void twitter_init(PurplePlugin *plugin)
 			TWITTER_PREF_SYNC_STATUS_DEFAULT);
 	prpl_info.protocol_options = g_list_append (prpl_info.protocol_options, option);
 
+	/* Automatically generate a buddylist based on followers */
+	option = purple_account_option_bool_new (
+			("Add followers as friends (NOT recommended for large follower list)"),
+			TWITTER_PREF_GET_FRIENDS,
+			TWITTER_PREF_GET_FRIENDS_DEFAULT);
+	prpl_info.protocol_options = g_list_append (prpl_info.protocol_options, option);
+
 	/* Add URL link to each tweet */
 	option = purple_account_option_bool_new (
 			("Add URL link to each tweet"),
