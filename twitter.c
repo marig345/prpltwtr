@@ -575,7 +575,7 @@ static void twitter_status_data_update_conv(PurpleAccount *account,
 	g_free(tweet);
 }
 
-static void twitter_buddy_set_status_data(PurpleAccount *account, char *src_user, TwitterStatusData *s)
+static void twitter_buddy_set_status_data(PurpleAccount *account, const char *src_user, TwitterStatusData *s)
 {
 	PurpleBuddy *b;
 	TwitterBuddyData *buddy_data;
@@ -848,17 +848,13 @@ static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 			{
 				twitter_connection_set_last_home_timeline_id(gc, status->id);
 			}
-
-			//if (status->id >
-			//twitter_buddy_set_user_data(account, user_data, FALSE);
-			//twitter_status_data_update_conv(account, screen_name, status, add_link);
-			//twitter_buddy_set_status_data(account, screen_name, status);
+			twitter_buddy_set_status_data(account, screen_name, status);
+			twitter_buddy_set_user_data(account, user_data, FALSE);
 
 			/* update user_reply_id_table table */
 			//gchar *reply_id = g_strdup_printf ("%lld", status->id);
 			//g_hash_table_insert (twitter->user_reply_id_table,
 					//g_strdup (screen_name), reply_id);
-			//g_free(screen_name);
 		}
 	}
 }
