@@ -1408,9 +1408,20 @@ static void twitter_connected(PurpleAccount *account)
 	twitter->get_replies_timer = purple_timeout_add_seconds(
 			60 * purple_account_get_int(account, TWITTER_PREF_REPLIES_TIMEOUT, TWITTER_PREF_REPLIES_TIMEOUT_DEFAULT),
 			twitter_get_replies_timeout, account);
-	twitter->get_friends_timer = purple_timeout_add_seconds(
-			60 * purple_account_get_int(account, TWITTER_PREF_USER_STATUS_TIMEOUT, TWITTER_PREF_USER_STATUS_TIMEOUT_DEFAULT),
-			twitter_get_friends_timeout, account);
+
+	int get_friends_timer_timeout = purple_account_get_int(account, TWITTER_PREF_USER_STATUS_TIMEOUT, TWITTER_PREF_USER_STATUS_TIMEOUT_DEFAULT);
+	gboolean get_following = purple_account_get_bool(account, TWITTER_PREF_GET_FRIENDS, TWITTER_PREF_GET_FRIENDS_DEFAULT);
+
+	/* Only update the buddy list if the user set the timeout to a positive number
+	 * and the user wants to retrieve his following list */
+	if (get_friends_timer_timeout > 0 && get_following)
+	{
+		twitter->get_friends_timer = purple_timeout_add_seconds(
+				60 * purple_account_get_int(account, TWITTER_PREF_USER_STATUS_TIMEOUT, TWITTER_PREF_USER_STATUS_TIMEOUT_DEFAULT),
+				twitter_get_friends_timeout, account);
+	} else {
+		twitter->get_friends_timer = 0;
+	}
 }
 static void twitter_get_friends_verify_connection_cb(PurpleAccount *account,
 		GList *nodes,
