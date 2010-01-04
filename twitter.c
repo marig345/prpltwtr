@@ -1366,6 +1366,17 @@ static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 	}
 }
 
+static void twitter_set_all_buddies_online(PurpleAccount *account)
+{
+	GSList *buddies = purple_find_buddies(account, NULL);
+	GSList *l;
+	for (l = buddies; l; l = l->next)
+	{
+		purple_prpl_got_user_status(account, ((PurpleBuddy *) l->data)->name, "online",
+				"message", NULL, NULL);
+	}
+	g_slist_free(buddies);
+}
 
 static void twitter_connected(PurpleAccount *account)
 {
@@ -1707,6 +1718,7 @@ static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, xmlnod
 				NULL);
 	} else {
 		twitter_connected(acct);
+		twitter_set_all_buddies_online(acct);
 	}
 }
 
@@ -1748,6 +1760,7 @@ static void twitter_verify_connection(PurpleAccount *acct)
 					NULL);
 		} else {
 			twitter_connected(acct);
+			twitter_set_all_buddies_online(acct);
 		}
 	}
 	else {
