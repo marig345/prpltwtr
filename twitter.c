@@ -966,7 +966,7 @@ static gboolean twitter_get_replies_timeout (gpointer data)
 /******************************************************
  *  Twitter search
  ******************************************************/
-static void _twitter_chat_context_destroy (TwitterConvChatContext *ctx)
+static void twitter_conv_chat_context_free (TwitterConvChatContext *ctx)
 {
 	if (ctx->timer_handle)
 	{
@@ -991,7 +991,7 @@ static void twitter_chat_search_leave(TwitterConvChatContext *ctx_base)
 	TwitterConnectionData *twitter = gc->proto_data;
 
 	g_hash_table_remove(twitter->search_chat_ids, ctx->search_text);
-	_twitter_chat_context_destroy(ctx->base);
+	twitter_conv_chat_context_free(ctx->base);
 
 	ctx->last_tweet_id = 0;
 
@@ -1014,7 +1014,7 @@ static void twitter_chat_timeline_leave(TwitterConvChatContext *ctx_base)
 	TwitterConnectionData *twitter = gc->proto_data;
 
 	g_hash_table_remove(twitter->timeline_chat_ids, &ctx->timeline_id);
-	_twitter_chat_context_destroy(ctx->base);
+	twitter_conv_chat_context_free(ctx->base);
 
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
@@ -1172,7 +1172,7 @@ static int twitter_chat_search_send(TwitterConvChatContext *ctx_base, const gcha
 	}
 }
 
-static TwitterConvChatContext *twitter_chat_context_new(
+static TwitterConvChatContext *twitter_conv_chat_context_new(
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
 	TwitterChatLeaveFunc leave_cb, TwitterChatSendMessageFunc send_message_cb,
 	gpointer data)
@@ -1193,7 +1193,7 @@ static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAcc
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 
-	ctx->base = twitter_chat_context_new(TWITTER_CHAT_SEARCH, account, chat_name,
+	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_SEARCH, account, chat_name,
 			twitter_chat_search_leave, twitter_chat_search_send, ctx);
 	ctx->search_text = g_strdup(search_text);
 	return ctx;
@@ -1204,7 +1204,7 @@ static TwitterTimelineTimeoutContext *twitter_timeline_timeout_context_new(Purpl
 {
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
 
-	ctx->base = twitter_chat_context_new(TWITTER_CHAT_TIMELINE, account, chat_name,
+	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_TIMELINE, account, chat_name,
 			twitter_chat_timeline_leave, twitter_chat_timeline_send, ctx);
 	ctx->timeline_id = timeline_id;
 	return ctx;
