@@ -58,9 +58,6 @@ struct _TwitterConvChatContext
 	guint timer_handle;
 	gchar *chat_name;
 	gpointer data;
-
-	TwitterChatLeaveFunc leave_cb;
-	TwitterChatSendMessageFunc send_message_cb;
 };
 
 typedef struct
@@ -1174,15 +1171,12 @@ static int twitter_chat_search_send(TwitterConvChatContext *ctx_base, const gcha
 
 static TwitterConvChatContext *twitter_conv_chat_context_new(
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
-	TwitterChatLeaveFunc leave_cb, TwitterChatSendMessageFunc send_message_cb,
 	gpointer data)
 {
 	TwitterConvChatContext *ctx = g_slice_new0(TwitterConvChatContext);
 	ctx->type = type;
 	ctx->account = account;
 	ctx->chat_name = g_strdup(chat_name);
-	ctx->leave_cb = leave_cb;
-	ctx->send_message_cb = send_message_cb;
 	ctx->data = data;
 
 	return ctx;
@@ -1193,8 +1187,7 @@ static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAcc
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 
-	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_SEARCH, account, chat_name,
-			twitter_chat_search_leave, twitter_chat_search_send, ctx);
+	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_SEARCH, account, chat_name, ctx);
 	ctx->search_text = g_strdup(search_text);
 	return ctx;
 }
@@ -1204,8 +1197,7 @@ static TwitterTimelineTimeoutContext *twitter_timeline_timeout_context_new(Purpl
 {
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
 
-	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_TIMELINE, account, chat_name,
-			twitter_chat_timeline_leave, twitter_chat_timeline_send, ctx);
+	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_TIMELINE, account, chat_name, ctx);
 	ctx->timeline_id = timeline_id;
 	return ctx;
 }
@@ -1236,9 +1228,19 @@ static void twitter_chat_leave(PurpleConnection *gc, int id) {
 
 	g_return_if_fail(ctx != NULL);
 
-	if (ctx->leave_cb)
-		ctx->leave_cb(ctx);
+	switch (ctx->type)
+	{
+		case TWITTER_CHAT_SEARCH:
+			twitter_chat_search_leave(ctx);
+			break;
+		case TWITTER_CHAT_TIMELINE:
+			twitter_chat_timeline_leave(ctx);
+			break;
+		default:
+			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", ctx->type);
+	}
 }
+
 static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 		PurpleMessageFlags flags) {
 	PurpleConversation *conv = purple_find_chat(gc, id);
@@ -1246,9 +1248,18 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 
 	g_return_val_if_fail(ctx != NULL, -1);
 
-	if (ctx->send_message_cb)
-		return ctx->send_message_cb(ctx, message);
-	return 0;
+	switch (ctx->type)
+	{
+		case TWITTER_CHAT_SEARCH:
+			return twitter_chat_search_send(ctx, message);
+			break;
+		case TWITTER_CHAT_TIMELINE:
+			return twitter_chat_timeline_send(ctx, message);
+			break;
+		default:
+			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", ctx->type);
+			return 0;
+	}
 }
 
 static gint twitter_get_next_chat_id()
