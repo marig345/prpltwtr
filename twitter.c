@@ -2158,13 +2158,20 @@ static void twitter_get_cb_info(PurpleConnection *gc, int id, const char *who) {
 	twitter_get_info(gc, who);
 }
 
+static gboolean twitter_chat_auto_open(PurpleChat *chat)
+{
+	g_return_val_if_fail(chat != NULL, FALSE);
+	GHashTable *components = purple_chat_get_components(chat);
+	char *auto_open = g_hash_table_lookup(components, "auto_open");
+	return (auto_open != NULL && auto_open[0] != '0');
+}
+
 static void blist_example_menu_item(PurpleBlistNode *node, gpointer userdata) {
 	PurpleChat *chat = PURPLE_CHAT(node);
 	GHashTable *components = purple_chat_get_components(chat);
-	const char *auto_open = userdata;
 
 	g_hash_table_replace(components, g_strdup("auto_open"), 
-			(auto_open == NULL || auto_open[0] == '0' ? g_strdup("1") : g_strdup("0")));
+			(twitter_chat_auto_open(chat) ? g_strdup("0") : g_strdup("1")));
 
 }
 
@@ -2174,15 +2181,13 @@ static GList *twitter_blist_node_menu(PurpleBlistNode *node) {
 
 	if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
 		PurpleChat *chat = PURPLE_CHAT(node);
-		GHashTable *components = purple_chat_get_components(chat);
-		char *auto_open = g_hash_table_lookup(components, "auto_open");
 		char *label = g_strdup_printf("Automatically open chat on new tweets (Currently: %s)",
-			(auto_open == NULL || auto_open[0] == '0' ? "Off" : "On"));
+			(twitter_chat_auto_open(chat) ? "On" : "Off"));
 
 		PurpleMenuAction *action = purple_menu_action_new(
 				label,
 				PURPLE_CALLBACK(blist_example_menu_item),
-				auto_open,   /* userdata passed to the callback */
+				NULL,   /* userdata passed to the callback */
 				NULL);  /* child menu items */
 		g_free(label);
 		return g_list_append(NULL, action);
