@@ -2158,6 +2158,40 @@ static void twitter_get_cb_info(PurpleConnection *gc, int id, const char *who) {
 	twitter_get_info(gc, who);
 }
 
+static void blist_example_menu_item(PurpleBlistNode *node, gpointer userdata) {
+	PurpleChat *chat = PURPLE_CHAT(node);
+	GHashTable *components = purple_chat_get_components(chat);
+	const char *auto_open = userdata;
+
+	g_hash_table_replace(components, g_strdup("auto_open"), 
+			(auto_open == NULL || auto_open[0] == '0' ? g_strdup("1") : g_strdup("0")));
+
+}
+
+
+static GList *twitter_blist_node_menu(PurpleBlistNode *node) {
+	purple_debug_info(TWITTER_PROTOCOL_ID, "providing buddy list context menu item\n");
+
+	if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
+		PurpleChat *chat = PURPLE_CHAT(node);
+		GHashTable *components = purple_chat_get_components(chat);
+		char *auto_open = g_hash_table_lookup(components, "auto_open");
+		char *label = g_strdup_printf("Automatically open chat on new tweets (Currently: %s)",
+			(auto_open == NULL || auto_open[0] == '0' ? "Off" : "On"));
+
+		PurpleMenuAction *action = purple_menu_action_new(
+				label,
+				PURPLE_CALLBACK(blist_example_menu_item),
+				auto_open,   /* userdata passed to the callback */
+				NULL);  /* child menu items */
+		g_free(label);
+		return g_list_append(NULL, action);
+	} else {
+		return NULL;
+	}
+}
+
+
 /* normalize a username (e.g. remove whitespace, add default domain, etc.)
  * for twitter, this is a noop.
  */
@@ -2196,7 +2230,7 @@ static PurplePluginProtocolInfo prpl_info =
 	twitter_status_text,		/* status_text */
 	twitter_tooltip_text,	       /* tooltip_text */
 	twitter_status_types,	       /* status_types */
-	NULL, //twitter_blist_node_menu,	    /* blist_node_menu */
+	twitter_blist_node_menu,	    /* blist_node_menu */
 	twitter_chat_info,		  /* chat_info */
 	twitter_chat_info_defaults,	 /* chat_info_defaults */
 	twitter_login,		      /* login */
