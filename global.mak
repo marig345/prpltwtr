@@ -61,9 +61,7 @@ PURPLE_PLUGIN_DIR = $(PURPLE_INSTALL_PLUGINS_DIR)
 
 #include $(PIDGIN_COMMON_RULES)
 
-else
-
-IS_PIDGIN = $(shell pkg-config --atleast-version=2.0 pidgin && echo 1 || echo 0)
+else #LINUX
 
 ifeq ($(strip $(IS_PIDGIN)), 1)
 	PIDGIN_NAME := pidgin
