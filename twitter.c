@@ -84,8 +84,6 @@ typedef struct
 	long long last_home_timeline_id;
 	long long failed_get_replies_count;
 
-	//TODO, combine
-	GHashTable *timeline_chat_ids;
 	/* key: gchar *screen_name,
 	 * value: gchar *reply_id (then converted to long long)
 	 * Store the id of last reply sent from any user to @me
@@ -405,6 +403,11 @@ static char *twitter_chat_name_from_search(const char *search)
 	g_free(search_lower);
 	return chat_name;
 }
+
+static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
+{
+	return g_strdup("Timeline: Home");
+}
 static char *twitter_get_chat_name(GHashTable *components) {
 	const char *chat_type_str = g_hash_table_lookup(components, "chat_type");
 	TwitterChatType chat_type = chat_type_str == NULL ? 0 : strtol(chat_type_str, NULL, 10);
@@ -412,7 +415,7 @@ static char *twitter_get_chat_name(GHashTable *components) {
 	switch (chat_type)
 	{
 		case TWITTER_CHAT_TIMELINE:
-			return g_strdup("Timeline: Home");
+			return twitter_chat_name_from_timeline_id(0);
 			break;
 		case TWITTER_CHAT_SEARCH:
 			return twitter_chat_name_from_search((char *) g_hash_table_lookup(components, "search"));
@@ -1015,23 +1018,10 @@ static void twitter_chat_timeline_leave(TwitterConvChatContext *ctx_base)
 	gc = purple_account_get_connection(ctx->base->account);
 	TwitterConnectionData *twitter = gc->proto_data;
 
-	g_hash_table_remove(twitter->timeline_chat_ids, &ctx->timeline_id);
 	twitter_conv_chat_context_free(ctx->base);
 
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
-
-
-
-static PurpleConversation *twitter_conv_timeline_find(PurpleConnection *gc, const gint timeline_id)
-{
-	TwitterConnectionData *twitter = gc->proto_data;
-	gint *chat_id = g_hash_table_lookup(twitter->timeline_chat_ids, &timeline_id);
-	if (chat_id == NULL)
-		return NULL;
-	else
-		return purple_find_chat(gc, *chat_id);
-}
 
 static void twitter_search_cb(PurpleAccount *account,
 		const GArray *search_results,
@@ -1348,31 +1338,31 @@ static gboolean twitter_timeline_timeout(gpointer data)
 }
 
 static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *components) {
+	PurpleAccount *account = purple_connection_get_account(gc);
         const char *interval_str = g_hash_table_lookup(components, "interval");
 	guint timeline_id = 0;
         int interval = 0;
-        int default_interval = twitter_option_timeline_timeout(purple_connection_get_account(gc));
+        int default_interval = twitter_option_timeline_timeout(account);
 
         interval = strtol(interval_str, NULL, 10);
         if (interval < 1)
                 interval = default_interval;
 
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is joined timeline\n", gc->account->username);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is joined timeline\n", account->username);
 
-	if (!twitter_conv_timeline_find(gc, timeline_id)) {
-		PurpleAccount *account = purple_connection_get_account(gc);
+	char *chat_name = twitter_chat_name_from_timeline_id(timeline_id);
+        if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
 		TwitterConnectionData *twitter = gc->proto_data;
 		PurpleConversation *conv;
 
 		guint chat_id = twitter_get_next_chat_id();
 		TwitterTimelineTimeoutContext *ctx = twitter_timeline_timeout_context_new(
-				account, timeline_id, "Timeline: Home");
+				account, timeline_id, chat_name);
 
-		conv = serv_got_joined_chat(gc, chat_id, "Timeline: Home");
+		conv = serv_got_joined_chat(gc, chat_id, chat_name);
 
                 purple_conversation_set_data(conv, "twitter-chat-context", ctx->base);
 
-		g_hash_table_replace(twitter->timeline_chat_ids, g_memdup(&timeline_id, sizeof(timeline_id)), g_memdup(&chat_id, sizeof(chat_id)));
 		long long since_id = twitter_connection_get_last_home_timeline_id(gc);
 		//TODO: free
 		//purple_conversation_set_data(conv, "twitter-timeline-context", ctx);
@@ -1411,6 +1401,7 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 	} else {
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Timeline %d is already open.\n", timeline_id);
 	}
+	g_free(chat_name);
 
 }
 static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
@@ -1851,9 +1842,6 @@ static void twitter_login(PurpleAccount *acct)
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "logging in %s\n", acct->username);
 
-	twitter->timeline_chat_ids = g_hash_table_new_full(
-			g_int_hash, g_int_equal, g_free, g_free);
-
 	/* key: gchar *, value: gchar * (of a long long) */
 	twitter->user_reply_id_table = g_hash_table_new_full (
 			g_str_hash, g_str_equal, g_free, g_free);
@@ -1882,9 +1870,6 @@ static void twitter_close(PurpleConnection *gc)
 		g_hash_table_destroy (twitter->user_reply_id_table);
 	twitter->user_reply_id_table = NULL;
 
-	if (twitter->timeline_chat_ids)
-		g_hash_table_destroy (twitter->timeline_chat_ids);
-	twitter->timeline_chat_ids = NULL;
 
 	g_free(twitter);
 }
