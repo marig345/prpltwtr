@@ -989,12 +989,9 @@ static void twitter_conv_chat_context_free (TwitterConvChatContext *ctx)
 
 static void twitter_chat_search_leave(TwitterConvChatContext *ctx_base)
 {
-	PurpleConnection *gc;
 	TwitterSearchTimeoutContext *ctx;
 	g_return_if_fail(ctx_base != NULL);
 	ctx = (TwitterSearchTimeoutContext *) ctx_base->data;
-	gc = purple_account_get_connection(ctx->base->account);
-	TwitterConnectionData *twitter = gc->proto_data;
 
 	twitter_conv_chat_context_free(ctx->base);
 
@@ -1011,12 +1008,9 @@ static void twitter_chat_search_leave(TwitterConvChatContext *ctx_base)
 
 static void twitter_chat_timeline_leave(TwitterConvChatContext *ctx_base)
 {
-	PurpleConnection *gc;
 	TwitterTimelineTimeoutContext *ctx;
 	g_return_if_fail(ctx_base != NULL);
 	ctx = (TwitterTimelineTimeoutContext *) ctx_base->data;
-	gc = purple_account_get_connection(ctx->base->account);
-	TwitterConnectionData *twitter = gc->proto_data;
 
 	twitter_conv_chat_context_free(ctx->base);
 
@@ -1279,7 +1273,6 @@ static void twitter_chat_search_join(PurpleConnection *gc, const char *search, i
 
         if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
                 guint chat_id = twitter_get_next_chat_id();
-		TwitterConnectionData *twitter = gc->proto_data;
                 TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
                                 search, chat_name);
                 PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, chat_name);
@@ -1352,7 +1345,6 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 
 	char *chat_name = twitter_chat_name_from_timeline_id(timeline_id);
         if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
-		TwitterConnectionData *twitter = gc->proto_data;
 		PurpleConversation *conv;
 
 		guint chat_id = twitter_get_next_chat_id();
