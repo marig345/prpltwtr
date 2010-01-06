@@ -85,7 +85,6 @@ typedef struct
 	long long failed_get_replies_count;
 
 	//TODO, combine
-	GHashTable *search_chat_ids;
 	GHashTable *timeline_chat_ids;
 	/* key: gchar *screen_name,
 	 * value: gchar *reply_id (then converted to long long)
@@ -399,6 +398,13 @@ PurpleChat *twitter_find_blist_chat(PurpleAccount *account, const char *name)
 	return c;
 }
 
+static char *twitter_chat_name_from_search(const char *search)
+{
+	char *search_lower = g_utf8_strdown(search, -1);
+	char *chat_name = g_strdup_printf("Search: %s", search_lower);
+	g_free(search_lower);
+	return chat_name;
+}
 static char *twitter_get_chat_name(GHashTable *components) {
 	const char *chat_type_str = g_hash_table_lookup(components, "chat_type");
 	TwitterChatType chat_type = chat_type_str == NULL ? 0 : strtol(chat_type_str, NULL, 10);
@@ -409,7 +415,7 @@ static char *twitter_get_chat_name(GHashTable *components) {
 			return g_strdup("Timeline: Home");
 			break;
 		case TWITTER_CHAT_SEARCH:
-			return g_strdup_printf("Search: %s", (char *) g_hash_table_lookup(components, "search"));
+			return twitter_chat_name_from_search((char *) g_hash_table_lookup(components, "search"));
 			break;
 		default:
 			purple_debug_info(TWITTER_PROTOCOL_ID, "%s unknown chat_type %d\n", G_STRFUNC, chat_type);
@@ -987,7 +993,6 @@ static void twitter_chat_search_leave(TwitterConvChatContext *ctx_base)
 	gc = purple_account_get_connection(ctx->base->account);
 	TwitterConnectionData *twitter = gc->proto_data;
 
-	g_hash_table_remove(twitter->search_chat_ids, ctx->search_text);
 	twitter_conv_chat_context_free(ctx->base);
 
 	ctx->last_tweet_id = 0;
@@ -1027,20 +1032,6 @@ static PurpleConversation *twitter_conv_timeline_find(PurpleConnection *gc, cons
 	else
 		return purple_find_chat(gc, *chat_id);
 }
-static PurpleConversation *twitter_conv_search_find(PurpleConnection *gc, const gchar *name)
-{
-	TwitterConnectionData *twitter = gc->proto_data;
-	gchar *name_lower = g_utf8_strdown(name, -1);
-	gint *chat_id = g_hash_table_lookup(twitter->search_chat_ids, name_lower);
-
-	g_free(name_lower);
-
-	if (chat_id == NULL)
-		return NULL;
-	else
-		return purple_find_chat(gc, *chat_id);
-}
-
 
 static void twitter_search_cb(PurpleAccount *account,
 		const GArray *search_results,
@@ -1220,11 +1211,18 @@ static void get_saved_searches_cb (PurpleAccount *account,
 	}
 }
 
+static gboolean twitter_chat_auto_open(PurpleChat *chat)
+{
+	g_return_val_if_fail(chat != NULL, FALSE);
+	GHashTable *components = purple_chat_get_components(chat);
+	char *auto_open = g_hash_table_lookup(components, "auto_open");
+	return (auto_open != NULL && auto_open[0] != '0');
+}
+
 
 static void twitter_chat_leave(PurpleConnection *gc, int id) {
 	PurpleConversation *conv = purple_find_chat(gc, id);
 	TwitterConvChatContext *ctx = (TwitterConvChatContext *) purple_conversation_get_data(conv, "twitter-chat-context");
-
 
 	g_return_if_fail(ctx != NULL);
 
@@ -1270,6 +1268,7 @@ static gint twitter_get_next_chat_id()
 
 static void twitter_chat_search_join(PurpleConnection *gc, const char *search, int interval)
 {
+	PurpleAccount *account = purple_connection_get_account(gc);
         int default_interval = twitter_option_search_timeout(purple_connection_get_account(gc));
 
 	if (search == NULL || search[0] == '\0')
@@ -1286,17 +1285,15 @@ static void twitter_chat_search_join(PurpleConnection *gc, const char *search, i
         if (interval < 1)
                 interval = default_interval;
 
-        if (!twitter_conv_search_find(gc, search)) {
+	char *chat_name = twitter_chat_name_from_search(search);
+
+        if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
                 guint chat_id = twitter_get_next_chat_id();
 		TwitterConnectionData *twitter = gc->proto_data;
-                PurpleAccount *account = purple_connection_get_account(gc);
-		char *chat_name = g_strdup_printf("Search: %s", search);
                 TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
                                 search, chat_name);
                 PurpleConversation *conv = serv_got_joined_chat(gc, chat_id, chat_name);
-		g_free(chat_name);
 
-		g_hash_table_replace(twitter->search_chat_ids, g_utf8_strdown(search, -1), g_memdup(&chat_id, sizeof(chat_id)));
                 purple_conversation_set_data(conv, "twitter-chat-context", ctx->base);
 
                 twitter_api_search(account,
@@ -1311,6 +1308,7 @@ static void twitter_chat_search_join(PurpleConnection *gc, const char *search, i
         } else {
                 purple_debug_info(TWITTER_PROTOCOL_ID, "Search %s is already open.", search);
         }
+	g_free(chat_name);
 }
 static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable *components) {
         const char *search = g_hash_table_lookup(components, "search");
@@ -1853,10 +1851,6 @@ static void twitter_login(PurpleAccount *acct)
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "logging in %s\n", acct->username);
 
-	/* key: gchar *, value: gchar * (of a long long) */
-	twitter->search_chat_ids = g_hash_table_new_full(
-			g_str_hash, g_str_equal, g_free, g_free);
-
 	twitter->timeline_chat_ids = g_hash_table_new_full(
 			g_int_hash, g_int_equal, g_free, g_free);
 
@@ -1887,10 +1881,6 @@ static void twitter_close(PurpleConnection *gc)
 	if (twitter->user_reply_id_table)
 		g_hash_table_destroy (twitter->user_reply_id_table);
 	twitter->user_reply_id_table = NULL;
-
-	if (twitter->search_chat_ids)
-		g_hash_table_destroy (twitter->search_chat_ids);
-	twitter->search_chat_ids = NULL;
 
 	if (twitter->timeline_chat_ids)
 		g_hash_table_destroy (twitter->timeline_chat_ids);
@@ -2181,14 +2171,6 @@ static void twitter_get_cb_info(PurpleConnection *gc, int id, const char *who) {
 			gc->account->username, conv->name);
 
 	twitter_get_info(gc, who);
-}
-
-static gboolean twitter_chat_auto_open(PurpleChat *chat)
-{
-	g_return_val_if_fail(chat != NULL, FALSE);
-	GHashTable *components = purple_chat_get_components(chat);
-	char *auto_open = g_hash_table_lookup(components, "auto_open");
-	return (auto_open != NULL && auto_open[0] != '0');
 }
 
 static void blist_example_menu_item(PurpleBlistNode *node, gpointer userdata) {
