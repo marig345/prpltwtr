@@ -2232,12 +2232,26 @@ static void twitter_get_cb_info(PurpleConnection *gc, int id, const char *who) {
 }
 
 static void blist_example_menu_item(PurpleBlistNode *node, gpointer userdata) {
+	TwitterConvChatContext *ctx;
 	PurpleChat *chat = PURPLE_CHAT(node);
+	PurpleAccount *account = purple_chat_get_account(chat);
 	GHashTable *components = purple_chat_get_components(chat);
+	const char *chat_name = twitter_get_chat_name(components);
+
+	gboolean new_state = !twitter_chat_auto_open(chat);
+
+	//If no conversation exists and we've set this to NOT auto open, let's free some memory
+	if (!new_state 
+		&& !purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)
+		&& (ctx = twitter_find_chat_context(account, chat_name)))
+
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "No more auto open, destroying context\n");
+		twitter_chat_context_endpoint_free(ctx->type, ctx->endpoint_data);
+	}
 
 	g_hash_table_replace(components, g_strdup("auto_open"), 
-			(twitter_chat_auto_open(chat) ? g_strdup("0") : g_strdup("1")));
-
+			(new_state ? g_strdup("1") : g_strdup("0")));
 }
 
 
