@@ -51,13 +51,17 @@ typedef struct _TwitterConvChatContext TwitterConvChatContext;
 typedef void (*TwitterChatLeaveFunc)(TwitterConvChatContext *ctx);
 typedef gint (*TwitterChatSendMessageFunc)(TwitterConvChatContext *ctx, const char *message);
 
+/* When I have time, I'd like to make this event driven
+ * Where there is an object with attached events when the timeout completes
+ * Then depending on actions, events will be detached. If event count = 0
+ * then the timer stops. That would be nice... */
 struct _TwitterConvChatContext
 {
 	TwitterChatType type;
 	PurpleAccount *account;
 	guint timer_handle;
 	gchar *chat_name;
-	gpointer data;
+	gpointer endpoint_data;
 };
 
 typedef struct
@@ -1025,11 +1029,9 @@ static void twitter_conv_chat_context_free(TwitterConvChatContext *ctx)
 	g_slice_free(TwitterConvChatContext, ctx);
 }
 
-static void twitter_chat_search_leave(TwitterConvChatContext *ctx_base)
+static void twitter_search_timeout_context_free(TwitterSearchTimeoutContext *ctx)
 {
-	TwitterSearchTimeoutContext *ctx;
-	g_return_if_fail(ctx_base != NULL);
-	ctx = (TwitterSearchTimeoutContext *) ctx_base->data;
+	g_return_if_fail(ctx != NULL);
 
 	twitter_conv_chat_context_free(ctx->base);
 
@@ -1044,11 +1046,9 @@ static void twitter_chat_search_leave(TwitterConvChatContext *ctx_base)
 	g_slice_free (TwitterSearchTimeoutContext, ctx);
 } 
 
-static void twitter_chat_timeline_leave(TwitterConvChatContext *ctx_base)
+static void twitter_timeline_timeout_context_free(TwitterTimelineTimeoutContext *ctx)
 {
-	TwitterTimelineTimeoutContext *ctx;
-	g_return_if_fail(ctx_base != NULL);
-	ctx = (TwitterTimelineTimeoutContext *) ctx_base->data;
+	g_return_if_fail(ctx != NULL);
 
 	twitter_conv_chat_context_free(ctx->base);
 
@@ -1154,7 +1154,7 @@ static int twitter_chat_search_send(TwitterConvChatContext *ctx_base, const gcha
 {
 	PurpleAccount *account = ctx_base->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) ctx_base->data;
+	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) ctx_base->endpoint_data;
 	PurpleConversation *conv = twitter_chat_context_find_conv(ctx_base);
 	char *status;
 	char *message_lower, *search_text_lower;
@@ -1194,7 +1194,7 @@ static int twitter_chat_search_send(TwitterConvChatContext *ctx_base, const gcha
 
 static TwitterConvChatContext *twitter_conv_chat_context_new(
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
-	gpointer data)
+	gpointer endpoint_data)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
@@ -1203,7 +1203,7 @@ static TwitterConvChatContext *twitter_conv_chat_context_new(
 	ctx->type = type;
 	ctx->account = account;
 	ctx->chat_name = g_strdup(chat_name);
-	ctx->data = data;
+	ctx->endpoint_data = endpoint_data;
 
 	g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), ctx);
 
@@ -1248,6 +1248,22 @@ static void get_saved_searches_cb (PurpleAccount *account,
 	}
 }
 
+static void twitter_chat_context_endpoint_free(TwitterChatType type, gpointer data)
+{
+	//I don't particularly like this...
+	g_return_if_fail(data != NULL);
+	switch (type)
+	{
+		case TWITTER_CHAT_SEARCH:
+			twitter_search_timeout_context_free((TwitterSearchTimeoutContext *)data);
+			break;
+		case TWITTER_CHAT_TIMELINE:
+			twitter_timeline_timeout_context_free((TwitterTimelineTimeoutContext *)data);
+			break;
+		default:
+			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", type);
+	}
+}
 
 static void twitter_chat_leave(PurpleConnection *gc, int id) {
 	PurpleConversation *conv = purple_find_chat(gc, id);
@@ -1262,17 +1278,7 @@ static void twitter_chat_leave(PurpleConnection *gc, int id) {
 		return;
 	}
 
-	switch (ctx->type)
-	{
-		case TWITTER_CHAT_SEARCH:
-			twitter_chat_search_leave(ctx);
-			break;
-		case TWITTER_CHAT_TIMELINE:
-			twitter_chat_timeline_leave(ctx);
-			break;
-		default:
-			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", ctx->type);
-	}
+	twitter_chat_context_endpoint_free(ctx->type, ctx->endpoint_data);
 }
 
 static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
@@ -1308,7 +1314,7 @@ static gpointer twitter_find_chat_context_endpoint_data(PurpleAccount *account, 
 	TwitterConvChatContext *ctx_base = twitter_find_chat_context(account, chat_name);
 	if (!ctx_base)
 		return NULL;
-	return ctx_base->data;
+	return ctx_base->endpoint_data;
 }
 
 static void twitter_chat_search_join(PurpleConnection *gc, const char *search, int interval)
