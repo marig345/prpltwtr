@@ -420,7 +420,7 @@ static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
 {
 	return g_strdup("Timeline: Home");
 }
-static char *twitter_get_chat_name(GHashTable *components) {
+static char *twitter_chat_get_name(GHashTable *components) {
 	const char *chat_type_str = g_hash_table_lookup(components, "chat_type");
 	TwitterChatType chat_type = chat_type_str == NULL ? 0 : strtol(chat_type_str, NULL, 10);
 
@@ -2231,12 +2231,12 @@ static void twitter_get_cb_info(PurpleConnection *gc, int id, const char *who) {
 	twitter_get_info(gc, who);
 }
 
-static void blist_example_menu_item(PurpleBlistNode *node, gpointer userdata) {
+static void twitter_blist_chat_auto_open_toggle(PurpleBlistNode *node, gpointer userdata) {
 	TwitterConvChatContext *ctx;
 	PurpleChat *chat = PURPLE_CHAT(node);
 	PurpleAccount *account = purple_chat_get_account(chat);
 	GHashTable *components = purple_chat_get_components(chat);
-	const char *chat_name = twitter_get_chat_name(components);
+	const char *chat_name = twitter_chat_get_name(components);
 
 	gboolean new_state = !twitter_chat_auto_open(chat);
 
@@ -2265,7 +2265,7 @@ static GList *twitter_blist_node_menu(PurpleBlistNode *node) {
 
 		PurpleMenuAction *action = purple_menu_action_new(
 				label,
-				PURPLE_CALLBACK(blist_example_menu_item),
+				PURPLE_CALLBACK(twitter_blist_chat_auto_open_toggle),
 				NULL,   /* userdata passed to the callback */
 				NULL);  /* child menu items */
 		g_free(label);
@@ -2337,7 +2337,7 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL,//TODO?	    /* set_permit_deny */
 	twitter_chat_join,		  /* join_chat */
 	NULL,		/* reject_chat */
-	twitter_get_chat_name,	      /* get_chat_name */
+	twitter_chat_get_name,	      /* get_chat_name */
 	NULL,		/* chat_invite */
 	twitter_chat_leave,		 /* chat_leave */
 	NULL,//twitter_chat_whisper,	       /* chat_whisper */
