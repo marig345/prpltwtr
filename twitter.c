@@ -1501,6 +1501,37 @@ static void twitter_set_all_buddies_online(PurpleAccount *account)
 	g_slist_free(buddies);
 }
 
+static void twitter_init_auto_open_contexts(PurpleAccount *account)
+{
+	PurpleChat *chat;
+	PurpleBlistNode *node, *group;
+	PurpleBuddyList *purplebuddylist = purple_get_blist();
+	PurpleConnection *gc = purple_account_get_connection(account);
+	GHashTable *components;
+
+	g_return_if_fail(purplebuddylist != NULL);
+
+	for (group = purplebuddylist->root; group != NULL; group = group->next) {
+		for (node = group->child; node != NULL; node = node->next) {
+			if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
+
+				chat = (PurpleChat*)node;
+
+				if (account != chat->account)
+					continue;
+
+				if (twitter_chat_auto_open(chat))
+				{
+					components = purple_chat_get_components(chat);
+					twitter_chat_join_do(gc, components, FALSE);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
 static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
@@ -1549,6 +1580,7 @@ static void twitter_connected(PurpleAccount *account)
 	} else {
 		twitter->get_friends_timer = 0;
 	}
+	twitter_init_auto_open_contexts(account);
 }
 static void twitter_get_friends_verify_connection_cb(PurpleAccount *account,
 		GList *nodes,
