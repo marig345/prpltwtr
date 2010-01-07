@@ -1317,7 +1317,7 @@ static gpointer twitter_find_chat_context_endpoint_data(PurpleAccount *account, 
 	return ctx_base->endpoint_data;
 }
 
-static void twitter_chat_search_join(PurpleConnection *gc, const char *search, int interval)
+static void twitter_chat_search_join(PurpleConnection *gc, const char *search, int interval, gboolean open_conv)
 {
 	PurpleAccount *account = purple_connection_get_account(gc);
         int default_interval = twitter_option_search_timeout(purple_connection_get_account(gc));
@@ -1339,8 +1339,11 @@ static void twitter_chat_search_join(PurpleConnection *gc, const char *search, i
 	char *chat_name = twitter_chat_name_from_search(search);
 
         if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
-                guint chat_id = twitter_get_next_chat_id();
-                serv_got_joined_chat(gc, chat_id, chat_name);
+		if (open_conv)
+		{
+			guint chat_id = twitter_get_next_chat_id();
+			serv_got_joined_chat(gc, chat_id, chat_name);
+		}
 		if (!twitter_find_chat_context(account, chat_name))
 		{
 			TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
@@ -1350,8 +1353,6 @@ static void twitter_chat_search_join(PurpleConnection *gc, const char *search, i
 					search, ctx->last_tweet_id,
 					TWITTER_SEARCH_RPP_DEFAULT,
 					twitter_search_cb, NULL, ctx);
-
-
 			ctx->base->timer_handle = purple_timeout_add_seconds(
 					60 * interval,
 					twitter_search_timeout, ctx);
@@ -1361,13 +1362,13 @@ static void twitter_chat_search_join(PurpleConnection *gc, const char *search, i
         }
 	g_free(chat_name);
 }
-static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable *components) {
+static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable *components, gboolean open_conv) {
         const char *search = g_hash_table_lookup(components, "search");
         const char *interval_str = g_hash_table_lookup(components, "interval");
         int interval = 0;
 
         interval = interval_str == NULL ? 0 : strtol(interval_str, NULL, 10);
-	twitter_chat_search_join(gc, search, interval);
+	twitter_chat_search_join(gc, search, interval, open_conv);
 }
 
 static gboolean twitter_timeline_timeout(gpointer data)
@@ -1398,7 +1399,7 @@ static gboolean twitter_timeline_timeout(gpointer data)
 	return TRUE;
 }
 
-static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *components) {
+static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *components, gboolean open_conv) {
 	PurpleAccount *account = purple_connection_get_account(gc);
         const char *interval_str = g_hash_table_lookup(components, "interval");
 	guint timeline_id = 0;
@@ -1413,8 +1414,11 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 
 	char *chat_name = twitter_chat_name_from_timeline_id(timeline_id);
         if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
-		guint chat_id = twitter_get_next_chat_id();
-		serv_got_joined_chat(gc, chat_id, chat_name);
+		if (open_conv)
+		{
+			guint chat_id = twitter_get_next_chat_id();
+			serv_got_joined_chat(gc, chat_id, chat_name);
+		}
 		if (!twitter_find_chat_context(account, chat_name))
 		{
 			TwitterTimelineTimeoutContext *ctx = twitter_timeline_timeout_context_new(
@@ -1466,20 +1470,23 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *compone
 	g_free(chat_name);
 
 }
-static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
+static void twitter_chat_join_do(PurpleConnection *gc, GHashTable *components, gboolean open_conv) {
 	const char *conv_type_str = g_hash_table_lookup(components, "chat_type");
 	gint conv_type = conv_type_str == NULL ? 0 : strtol(conv_type_str, NULL, 10);
 	switch (conv_type)
 	{
 		case TWITTER_CHAT_SEARCH:
-			twitter_chat_search_join_components(gc, components);
+			twitter_chat_search_join_components(gc, components, open_conv);
 			break;
 		case TWITTER_CHAT_TIMELINE:
-			twitter_chat_timeline_join(gc, components);
+			twitter_chat_timeline_join(gc, components, open_conv);
 			break;
 		default:
 			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", conv_type);
 	}
+}
+static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
+	twitter_chat_join_do(gc, components, TRUE);
 }
 
 static void twitter_set_all_buddies_online(PurpleAccount *account)
@@ -2248,6 +2255,9 @@ static void twitter_blist_chat_auto_open_toggle(PurpleBlistNode *node, gpointer 
 	{
 		purple_debug_info(TWITTER_PROTOCOL_ID, "No more auto open, destroying context\n");
 		twitter_chat_context_endpoint_free(ctx->type, ctx->endpoint_data);
+	} else if (new_state && !twitter_find_chat_context(account, chat_name)) {
+		//Join the chat, but don't automatically open the conversation
+		twitter_chat_join_do(purple_account_get_connection(account), components, FALSE);
 	}
 
 	g_hash_table_replace(components, g_strdup("auto_open"), 
@@ -2418,7 +2428,8 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 				"@name clicked",
 				"Sorry, this has not been implemented yet");
 	} else if (!strcmp(cmd_arg, TWITTER_URI_ACTION_SEARCH)) {
-		twitter_chat_search_join(purple_account_get_connection(account), text, 0);
+		//join chat with default interval, open in conv window
+		twitter_chat_search_join(purple_account_get_connection(account), text, 0, TRUE);
 	}
 	return TRUE;
 }
