@@ -398,24 +398,15 @@ static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
 {
 	return g_strdup("Timeline: Home");
 }
-static char *twitter_chat_get_name(GHashTable *components) {
-	const char *chat_type_str = g_hash_table_lookup(components, "chat_type");
-	TwitterChatType chat_type = chat_type_str == NULL ? 0 : strtol(chat_type_str, NULL, 10);
-
-	switch (chat_type)
-	{
-		case TWITTER_CHAT_TIMELINE:
-			return twitter_chat_name_from_timeline_id(0);
-			break;
-		case TWITTER_CHAT_SEARCH:
-			return twitter_chat_name_from_search((char *) g_hash_table_lookup(components, "search"));
-			break;
-		default:
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s unknown chat_type %d\n", G_STRFUNC, chat_type);
-			return g_strdup("Unknown");
-			break;
-	}
-}         
+static char *twitter_timeline_chat_name_from_components(GHashTable *components)
+{
+	return twitter_chat_name_from_timeline_id(0);
+}
+static char *twitter_search_chat_name_from_components(GHashTable *components)
+{
+	const char *search = g_hash_table_lookup(components, "search");
+	return twitter_chat_name_from_search(search);
+}
 
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
@@ -1153,13 +1144,41 @@ static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 	twitter_chat_timeline_send, //send_message
 	twitter_timeline_timeout_context_free, //endpoint_data_free
 	twitter_option_search_timeout, //get_default_interval
+	twitter_timeline_chat_name_from_components, //get_name
 };
 static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 {
 	twitter_chat_search_send, //send_message
 	twitter_search_timeout_context_free, //endpoint_data_free
 	twitter_option_timeline_timeout, //get_default_interval
+	twitter_search_chat_name_from_components, //get_name
 };
+
+static TwitterEndpointChatSettings *twitter_get_endpoint_chat_settings(TwitterChatType type)
+{
+	//TODO: I hate switch statements
+	switch (type)
+	{
+		case TWITTER_CHAT_TIMELINE:
+			return &TwitterEndpointTimelineSettings;
+			break;
+		case TWITTER_CHAT_SEARCH:
+			return &TwitterEndpointSearchSettings;
+			break;
+		default:
+			return NULL;
+			break;
+	}
+}
+static char *twitter_chat_get_name(GHashTable *components) {
+	const char *chat_type_str = g_hash_table_lookup(components, "chat_type");
+	TwitterChatType chat_type = chat_type_str == NULL ? 0 : strtol(chat_type_str, NULL, 10);
+
+	TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(chat_type);
+	if (settings && settings->get_name)
+		return settings->get_name(components);
+	return NULL;
+}
 
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
