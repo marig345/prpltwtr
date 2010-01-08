@@ -3,6 +3,9 @@
 void twitter_endpoint_chat_free(TwitterEndpointChat *ctx)
 {
 	PurpleConnection *gc;
+
+	if (ctx->settings && ctx->settings->endpoint_data_free)
+		ctx->settings->endpoint_data_free(ctx->endpoint_data);
 	gc = purple_account_get_connection(ctx->account);
 
 	if (ctx->timer_handle)

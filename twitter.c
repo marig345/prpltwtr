@@ -992,8 +992,6 @@ static void twitter_search_timeout_context_free(gpointer _ctx)
 	g_return_if_fail(_ctx != NULL);
 	TwitterSearchTimeoutContext *ctx = _ctx;
 
-	twitter_endpoint_chat_free(ctx->base);
-
 	ctx->last_tweet_id = 0;
 
 	g_free (ctx->search_text);
@@ -1009,8 +1007,6 @@ static void twitter_timeline_timeout_context_free(gpointer _ctx)
 {
 	g_return_if_fail(_ctx != NULL);
 	TwitterTimelineTimeoutContext *ctx = _ctx;
-
-	twitter_endpoint_chat_free(ctx->base);
 
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
@@ -1867,15 +1863,6 @@ static void twitter_verify_connection(PurpleAccount *acct)
 	}
 }
 
-static void _chat_contexts_value_free(gpointer value)
-{
-	TwitterEndpointChat *ctx = value;
-	if (ctx && ctx->settings && ctx->settings->endpoint_data_free)
-	{
-		ctx->settings->endpoint_data_free(ctx->endpoint_data);
-	}
-}
-
 static void twitter_login(PurpleAccount *acct)
 {
 	PurpleConnection *gc = purple_account_get_connection(acct);
@@ -1886,7 +1873,7 @@ static void twitter_login(PurpleAccount *acct)
 
 	/* key: gchar *, value: TwitterEndpointChat */
 	twitter->chat_contexts = g_hash_table_new_full(
-			g_str_hash, g_str_equal, g_free, _chat_contexts_value_free);
+			g_str_hash, g_str_equal, g_free, (GDestroyNotify) twitter_endpoint_chat_free);
 
 
 	/* key: gchar *, value: gchar * (of a long long) */
