@@ -1139,12 +1139,22 @@ static int twitter_chat_search_send(TwitterEndpointChat *ctx_base, const gchar *
 		return 0;
 	}
 }
+static gchar *twitter_search_verify_components(GHashTable *components)
+{
+	const char *search = g_hash_table_lookup(components, "search");
+	if (search == NULL || search[0] == '\0')
+	{
+		return g_strdup("Search must be filled in when joining a search chat");
+	}
+	return NULL;
+}
 static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 {
 	twitter_chat_timeline_send, //send_message
 	twitter_timeline_timeout_context_free, //endpoint_data_free
 	twitter_option_search_timeout, //get_default_interval
 	twitter_timeline_chat_name_from_components, //get_name
+	NULL, //verify_components
 };
 static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 {
@@ -1152,7 +1162,9 @@ static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 	twitter_search_timeout_context_free, //endpoint_data_free
 	twitter_option_timeline_timeout, //get_default_interval
 	twitter_search_chat_name_from_components, //get_name
+	twitter_search_verify_components, //verify_components
 };
+
 
 static TwitterEndpointChatSettings *twitter_get_endpoint_chat_settings(TwitterChatType type)
 {

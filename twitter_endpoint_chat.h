@@ -43,6 +43,7 @@ struct _TwitterEndpointChatSettings
 	void (*endpoint_data_free)(gpointer endpoint_data);
 	gint (*get_default_interval)(PurpleAccount *account);
 	gchar *(*get_name)(GHashTable *components);
+	gchar *(*verify_components)(GHashTable *components);
 };
 
 struct _TwitterEndpointChat
