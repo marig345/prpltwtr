@@ -1152,11 +1152,13 @@ static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 {
 	twitter_chat_timeline_send, //send_message
 	twitter_timeline_timeout_context_free, //endpoint_data_free
+	twitter_option_search_timeout, //get_default_interval
 };
 static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 {
 	twitter_chat_search_send, //send_message
 	twitter_search_timeout_context_free, //endpoint_data_free
+	twitter_option_timeline_timeout, //get_default_interval
 };
 
 
@@ -1278,7 +1280,8 @@ static gpointer twitter_find_chat_context_endpoint_data(PurpleAccount *account, 
 static void twitter_chat_search_join(PurpleConnection *gc, gboolean open_conv, int interval, const char *search)
 {
 	PurpleAccount *account = purple_connection_get_account(gc);
-        int default_interval = twitter_option_search_timeout(purple_connection_get_account(gc));
+	TwitterEndpointChatSettings *settings = &TwitterEndpointSearchSettings;
+        int default_interval = settings->get_default_interval(account);
 
 	if (search == NULL || search[0] == '\0')
 	{
@@ -1332,7 +1335,8 @@ static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable
 static void twitter_chat_timeline_join(PurpleConnection *gc, gboolean open_conv, int interval, guint timeline_id) 
 {
 	PurpleAccount *account = purple_connection_get_account(gc);
-        int default_interval = twitter_option_timeline_timeout(account);
+	TwitterEndpointChatSettings *settings = &TwitterEndpointTimelineSettings;
+        int default_interval = settings->get_default_interval(account);
 
         if (interval < 1)
                 interval = default_interval;

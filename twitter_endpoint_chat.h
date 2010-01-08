@@ -41,6 +41,7 @@ struct _TwitterEndpointChatSettings
 {
 	int (*send_message)(TwitterEndpointChat *endpoint_chat, const gchar *message);
 	void (*endpoint_data_free)(gpointer endpoint_data);
+	gint (*get_default_interval)(PurpleAccount *account);
 };
 
 struct _TwitterEndpointChat
