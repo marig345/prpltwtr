@@ -45,6 +45,7 @@ struct _TwitterEndpointChatSettings
 	gchar *(*get_name)(GHashTable *components);
 	gchar *(*verify_components)(GHashTable *components);
 	gboolean (*interval_timeout)(TwitterEndpointChat *endpoint_chat);
+	gboolean (*on_start)(TwitterEndpointChat *endpoint_chat);
 };
 
 struct _TwitterEndpointChat

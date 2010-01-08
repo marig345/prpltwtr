@@ -1075,6 +1075,46 @@ static gboolean twitter_search_timeout(TwitterEndpointChat *data)
 	return TRUE;
 }
 
+static gboolean twitter_endpoint_search_interval_start(TwitterEndpointChat *endpoint)
+{
+	TwitterSearchTimeoutContext *ctx = endpoint->endpoint_data;
+	twitter_api_search(endpoint->account,
+			ctx->search_text, ctx->last_tweet_id,
+			TWITTER_SEARCH_RPP_DEFAULT,
+			twitter_search_cb, NULL, ctx);
+	return TRUE;
+}
+static gboolean twitter_endpoint_timeline_interval_start(TwitterEndpointChat *endpoint)
+{
+	PurpleAccount *account = endpoint->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterTimelineTimeoutContext *ctx = endpoint->endpoint_data;
+	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s creating new timeline context\n", account->username);
+	//TODO: free
+
+	if (since_id == 0)
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", gc->account->username);
+		twitter_api_get_home_timeline(account,
+				since_id,
+				20,
+				1,
+				twitter_get_home_timeline_cb,
+				NULL,
+				ctx);
+	} else {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", gc->account->username, since_id);
+		twitter_api_get_home_timeline_all(account,
+				since_id,
+				twitter_get_home_timeline_all_cb,
+				NULL,
+				ctx);
+	}
+	return TRUE;
+}
+
 static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar *message)
 {
 	PurpleAccount *account = ctx_base->account;
@@ -1192,6 +1232,7 @@ static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 	twitter_timeline_chat_name_from_components, //get_name
 	NULL, //verify_components
 	twitter_timeline_timeout,
+	twitter_endpoint_timeline_interval_start,
 };
 static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 {
@@ -1201,6 +1242,7 @@ static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 	twitter_search_chat_name_from_components, //get_name
 	twitter_search_verify_components, //verify_components
 	twitter_search_timeout, //interval_timeout
+	twitter_endpoint_search_interval_start,
 };
 
 
@@ -1350,11 +1392,8 @@ static void twitter_chat_search_join(PurpleConnection *gc, gboolean open_conv, i
 		{
 			TwitterSearchTimeoutContext *ctx = twitter_search_timeout_context_new(account,
 					search, chat_name);
+			settings->on_start(ctx->base);
 
-			twitter_api_search(account,
-					search, ctx->last_tweet_id,
-					TWITTER_SEARCH_RPP_DEFAULT,
-					twitter_search_cb, NULL, ctx);
 			ctx->base->timer_handle = purple_timeout_add_seconds(
 					60 * interval,
 					twitter_interval_timeout, ctx->base);
@@ -1396,30 +1435,8 @@ static void twitter_chat_timeline_join(PurpleConnection *gc, gboolean open_conv,
 			TwitterTimelineTimeoutContext *ctx = twitter_timeline_timeout_context_new(
 					account, timeline_id, chat_name);
 
+			settings->on_start(ctx->base);
 
-			long long since_id = twitter_connection_get_last_home_timeline_id(gc);
-
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s creating new timeline context\n", account->username);
-			//TODO: free
-
-			if (since_id == 0)
-			{
-				purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", gc->account->username);
-				twitter_api_get_home_timeline(account,
-						since_id,
-						20,
-						1,
-						twitter_get_home_timeline_cb,
-						NULL,
-						ctx);
-			} else {
-				purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", gc->account->username, since_id);
-				twitter_api_get_home_timeline_all(account,
-						since_id,
-						twitter_get_home_timeline_all_cb,
-						NULL,
-						ctx);
-			}
 			//TODO: I don't think this timer should be here, but for the time being...
 			ctx->base->timer_handle = purple_timeout_add_seconds(
 					60 * interval,
