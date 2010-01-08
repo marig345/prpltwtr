@@ -24,6 +24,8 @@
 #include <sslconn.h>
 #include <request.h>
 
+#include "twitter_util.h"
+
 typedef enum
 {
 	TWITTER_CHAT_SEARCH = 0,
