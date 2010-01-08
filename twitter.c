@@ -977,14 +977,17 @@ static gboolean twitter_get_replies_timeout (gpointer data)
 
 static void twitter_search_timeout_context_free(gpointer _ctx)
 {
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 	g_return_if_fail(_ctx != NULL);
 	TwitterSearchTimeoutContext *ctx = _ctx;
 
 	ctx->last_tweet_id = 0;
 
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s %s\n", G_STRFUNC, ctx->search_text);
 	g_free (ctx->search_text);
 	ctx->search_text = NULL;
 
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s %s\n", G_STRFUNC, ctx->refresh_url);
 	g_free (ctx->refresh_url);
 	ctx->refresh_url = NULL;
 
@@ -1223,7 +1226,8 @@ static gboolean twitter_interval_timeout(gpointer data)
 static gpointer twitter_search_timeout_context_new(GHashTable *components)
 {
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
-	ctx->search_text = g_hash_table_lookup(components, "search");
+	ctx->search_text = g_strdup(g_hash_table_lookup(components, "search"));
+	ctx->refresh_url = NULL;
 	return ctx;
 }
 
@@ -1348,14 +1352,17 @@ static gpointer twitter_find_chat_context_endpoint_data(PurpleAccount *account, 
 	return ctx_base->endpoint_data;
 }
 
-static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable *components, gboolean open_conv) {
+static void twitter_endpoint_chat_open_conv(PurpleConnection *gc, TwitterEndpointChatSettings *settings,
+		GHashTable *components, gboolean open_conv) 
+{
         const char *interval_str = g_hash_table_lookup(components, "interval");
         int interval = 0;
+
+	g_return_if_fail(settings != NULL);
 
         interval = interval_str == NULL ? 0 : strtol(interval_str, NULL, 10);
 
 	PurpleAccount *account = purple_connection_get_account(gc);
-	TwitterEndpointChatSettings *settings = &TwitterEndpointSearchSettings;
         int default_interval = settings->get_default_interval(account);
 	gchar *error = NULL;
 
@@ -1385,7 +1392,7 @@ static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable
 			TwitterConnectionData *twitter = gc->proto_data;
 			TwitterEndpointChat *endpoint_chat = twitter_endpoint_chat_new(
 					settings, settings->type, account, chat_name, components);
-			g_hash_table_insert(twitter->chat_contexts, chat_name, endpoint_chat);
+			g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), endpoint_chat);
 			settings->on_start(endpoint_chat);
 
 			endpoint_chat->timer_handle = purple_timeout_add_seconds(
@@ -1398,71 +1405,13 @@ static void twitter_chat_search_join_components(PurpleConnection *gc, GHashTable
 	g_free(chat_name);
 }
 
-static void twitter_chat_timeline_join(PurpleConnection *gc, GHashTable *components, gboolean open_conv, int interval, guint timeline_id) 
-{
-	PurpleAccount *account = purple_connection_get_account(gc);
-	TwitterEndpointChatSettings *settings = &TwitterEndpointTimelineSettings;
-        int default_interval = settings->get_default_interval(account);
-
-        if (interval < 1)
-                interval = default_interval;
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s is joined timeline\n", account->username);
-
-	char *chat_name = twitter_chat_name_from_timeline_id(timeline_id);
-        if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
-		if (open_conv)
-		{
-			guint chat_id = twitter_get_next_chat_id();
-			serv_got_joined_chat(gc, chat_id, chat_name);
-		}
-		if (!twitter_find_chat_context(account, chat_name))
-		{
-			
-			TwitterConnectionData *twitter = gc->proto_data;
-			TwitterEndpointChat *endpoint_chat = twitter_endpoint_chat_new(
-					settings, TWITTER_CHAT_TIMELINE, account, chat_name, components);
-			g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), endpoint_chat);
-
-			settings->on_start(endpoint_chat);
-
-			//TODO: I don't think this timer should be here, but for the time being...
-			endpoint_chat->timer_handle = purple_timeout_add_seconds(
-					60 * interval,
-					twitter_interval_timeout, endpoint_chat);
-		} else {
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s using previous timeline context\n", account->username);
-		}
-	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Timeline %d is already open.\n", timeline_id);
-	}
-	g_free(chat_name);
-
-}
-static void twitter_chat_timeline_join_components(PurpleConnection *gc, GHashTable *components, gboolean open_conv) 
-{
-	guint timeline_id = 0;
-        const char *interval_str = g_hash_table_lookup(components, "interval");
-        int interval = 0;
-
-        interval = interval_str == NULL ? 0 : strtol(interval_str, NULL, 10);
-	twitter_chat_timeline_join(gc, components, open_conv, interval, timeline_id);
-}
-
 static void twitter_chat_join_do(PurpleConnection *gc, GHashTable *components, gboolean open_conv) {
 	const char *conv_type_str = g_hash_table_lookup(components, "chat_type");
 	gint conv_type = conv_type_str == NULL ? 0 : strtol(conv_type_str, NULL, 10);
-	switch (conv_type)
-	{
-		case TWITTER_CHAT_SEARCH:
-			twitter_chat_search_join_components(gc, components, open_conv);
-			break;
-		case TWITTER_CHAT_TIMELINE:
-			twitter_chat_timeline_join_components(gc, components, open_conv);
-			break;
-		default:
-			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", conv_type);
-	}
+	twitter_endpoint_chat_open_conv(gc,
+			twitter_get_endpoint_chat_settings(conv_type),
+			components,
+			open_conv);
 }
 static void twitter_chat_join(PurpleConnection *gc, GHashTable *components) {
 	twitter_chat_join_do(gc, components, TRUE);
