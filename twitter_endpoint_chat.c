@@ -1,6 +1,6 @@
 #include "twitter_endpoint_chat.h"
 
-void twitter_conv_chat_context_free(TwitterConvChatContext *ctx)
+void twitter_endpoint_chat_free(TwitterEndpointChat *ctx)
 {
 	PurpleConnection *gc;
 	gc = purple_account_get_connection(ctx->account);
@@ -15,14 +15,14 @@ void twitter_conv_chat_context_free(TwitterConvChatContext *ctx)
 		g_free(ctx->chat_name);
 		ctx->chat_name = NULL;
 	}
-	g_slice_free(TwitterConvChatContext, ctx);
+	g_slice_free(TwitterEndpointChat, ctx);
 }
 
-TwitterConvChatContext *twitter_conv_chat_context_new(
+TwitterEndpointChat *twitter_endpoint_chat_new(
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
 	gpointer endpoint_data)
 {
-	TwitterConvChatContext *ctx = g_slice_new0(TwitterConvChatContext);
+	TwitterEndpointChat *ctx = g_slice_new0(TwitterEndpointChat);
 	ctx->type = type;
 	ctx->account = account;
 	ctx->chat_name = g_strdup(chat_name);
