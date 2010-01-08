@@ -46,6 +46,7 @@ struct _TwitterEndpointChatSettings
 	gchar *(*verify_components)(GHashTable *components);
 	gboolean (*interval_timeout)(TwitterEndpointChat *endpoint_chat);
 	gboolean (*on_start)(TwitterEndpointChat *endpoint_chat);
+	gpointer (*create_endpoint_data)(GHashTable *components);
 };
 
 struct _TwitterEndpointChat
@@ -61,7 +62,7 @@ struct _TwitterEndpointChat
 TwitterEndpointChat *twitter_endpoint_chat_new(
 	TwitterEndpointChatSettings *settings,
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
-	gpointer endpoint_data);
+	GHashTable *components);
 
 void twitter_endpoint_chat_free(TwitterEndpointChat *ctx);
 

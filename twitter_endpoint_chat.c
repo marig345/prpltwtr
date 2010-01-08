@@ -24,14 +24,16 @@ void twitter_endpoint_chat_free(TwitterEndpointChat *ctx)
 TwitterEndpointChat *twitter_endpoint_chat_new(
 	TwitterEndpointChatSettings *settings,
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
-	gpointer endpoint_data)
+	GHashTable components)
 {
 	TwitterEndpointChat *ctx = g_slice_new0(TwitterEndpointChat);
 	ctx->settings = settings;
 	ctx->type = type;
 	ctx->account = account;
 	ctx->chat_name = g_strdup(chat_name);
-	ctx->endpoint_data = endpoint_data;
+	ctx->endpoint_data = settings->create_endpoint_data ?
+		settings->create_endpoint_data(components) :
+		NULL;
 
 	return ctx;
 }
