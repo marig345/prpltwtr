@@ -1108,6 +1108,7 @@ static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar
 		return 0;
 	}
 }
+
 static int twitter_chat_search_send(TwitterEndpointChat *ctx_base, const gchar *message)
 {
 	PurpleAccount *account = ctx_base->account;
@@ -1149,6 +1150,14 @@ static int twitter_chat_search_send(TwitterEndpointChat *ctx_base, const gchar *
 		return 0;
 	}
 }
+static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
+{
+	twitter_chat_timeline_send, //send_message
+};
+static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
+{
+	twitter_chat_search_send, //send_message
+};
 
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
@@ -1158,7 +1167,7 @@ static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAcc
 	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 
-	ctx->base = twitter_endpoint_chat_new(TWITTER_CHAT_SEARCH, account, chat_name, ctx);
+	ctx->base = twitter_endpoint_chat_new(&TwitterEndpointSearchSettings, TWITTER_CHAT_SEARCH, account, chat_name, ctx);
 	ctx->search_text = g_strdup(search_text);
 	g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), ctx->base); //shouldn't be here
 	return ctx;
@@ -1171,7 +1180,7 @@ static TwitterTimelineTimeoutContext *twitter_timeline_timeout_context_new(Purpl
 	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
 
-	ctx->base = twitter_endpoint_chat_new(TWITTER_CHAT_TIMELINE, account, chat_name, ctx);
+	ctx->base = twitter_endpoint_chat_new(&TwitterEndpointTimelineSettings, TWITTER_CHAT_TIMELINE, account, chat_name, ctx);
 	ctx->timeline_id = timeline_id;
 	g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), ctx->base); //shouldn't be here
 	return ctx;
@@ -1219,18 +1228,9 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 
 	g_return_val_if_fail(ctx != NULL, -1);
 
-	switch (ctx->type)
-	{
-		case TWITTER_CHAT_SEARCH:
-			return twitter_chat_search_send(ctx, message);
-			break;
-		case TWITTER_CHAT_TIMELINE:
-			return twitter_chat_timeline_send(ctx, message);
-			break;
-		default:
-			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", ctx->type);
-			return 0;
-	}
+	if (ctx->settings)
+		return ctx->settings->send_message(ctx, message);
+	return -1;
 }
 static gboolean twitter_timeline_timeout(gpointer data)
 {

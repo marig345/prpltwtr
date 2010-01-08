@@ -30,24 +30,28 @@ typedef enum
 	TWITTER_CHAT_TIMELINE = 1
 } TwitterChatType;
 
+typedef struct _TwitterEndpointChatSettings TwitterEndpointChatSettings;
 typedef struct _TwitterEndpointChat TwitterEndpointChat;
 typedef void (*TwitterChatLeaveFunc)(TwitterEndpointChat *ctx);
 typedef gint (*TwitterChatSendMessageFunc)(TwitterEndpointChat *ctx, const char *message);
 
-/* When I have time, I'd like to make this event driven
- * Where there is an object with attached events when the timeout completes
- * Then depending on actions, events will be detached. If event count = 0
- * then the timer stops. That would be nice... */
+struct _TwitterEndpointChatSettings
+{
+	int (*send_message)(TwitterEndpointChat *endpoint_chat, const gchar *message);
+};
+
 struct _TwitterEndpointChat
 {
 	TwitterChatType type;
 	PurpleAccount *account;
 	guint timer_handle;
 	gchar *chat_name;
+	TwitterEndpointChatSettings *settings;
 	gpointer endpoint_data;
 };
 
 TwitterEndpointChat *twitter_endpoint_chat_new(
+	TwitterEndpointChatSettings *settings,
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
 	gpointer endpoint_data);
 
