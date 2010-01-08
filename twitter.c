@@ -863,7 +863,6 @@ static gint twitter_get_next_chat_id()
 static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 		TwitterEndpointChat *endpoint_chat, GList *statuses)
 {
-	TwitterTimelineTimeoutContext *ctx = endpoint_chat->endpoint_data;
 	PurpleConnection *gc = purple_account_get_connection(account);
 	PurpleConvChat *chat;
 	PurpleConversation *conv;
@@ -921,7 +920,6 @@ static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 static void twitter_get_home_timeline_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
 {
 	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *)user_data;
-	TwitterTimelineTimeoutContext *ctx = endpoint_chat->endpoint_data;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -936,7 +934,6 @@ static void twitter_get_home_timeline_all_cb(PurpleAccount *account,
 		gpointer user_data)
 {
 	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *)user_data;
-	TwitterTimelineTimeoutContext *ctx = endpoint_chat->endpoint_data;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -1089,7 +1086,6 @@ static gboolean twitter_endpoint_timeline_interval_start(TwitterEndpointChat *en
 {
 	PurpleAccount *account = endpoint->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterTimelineTimeoutContext *ctx = endpoint->endpoint_data;
 	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s creating new timeline context\n", account->username);
@@ -1192,7 +1188,6 @@ static gchar *twitter_search_verify_components(GHashTable *components)
 
 static gboolean twitter_timeline_timeout(TwitterEndpointChat *endpoint_chat)
 {
-	TwitterTimelineTimeoutContext *ctx = (TwitterTimelineTimeoutContext *)endpoint_chat->endpoint_data;
 	PurpleAccount *account = endpoint_chat->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
 	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
