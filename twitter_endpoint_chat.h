@@ -39,6 +39,7 @@ typedef gint (*TwitterChatSendMessageFunc)(TwitterEndpointChat *ctx, const char 
 
 struct _TwitterEndpointChatSettings
 {
+	TwitterChatType type;
 	int (*send_message)(TwitterEndpointChat *endpoint_chat, const gchar *message);
 	void (*endpoint_data_free)(gpointer endpoint_data);
 	gint (*get_default_interval)(PurpleAccount *account);
