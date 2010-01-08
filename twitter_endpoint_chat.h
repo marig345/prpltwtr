@@ -44,6 +44,7 @@ struct _TwitterEndpointChatSettings
 	gint (*get_default_interval)(PurpleAccount *account);
 	gchar *(*get_name)(GHashTable *components);
 	gchar *(*verify_components)(GHashTable *components);
+	gboolean (*interval_timeout)(TwitterEndpointChat *endpoint_chat);
 };
 
 struct _TwitterEndpointChat
