@@ -29,7 +29,8 @@
 typedef enum
 {
 	TWITTER_CHAT_SEARCH = 0,
-	TWITTER_CHAT_TIMELINE = 1
+	TWITTER_CHAT_TIMELINE = 1,
+	TWITTER_CHAT_UNKNOWN = 2 //keep this as the last element
 } TwitterChatType;
 
 typedef struct _TwitterEndpointChatSettings TwitterEndpointChatSettings;

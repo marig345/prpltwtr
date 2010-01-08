@@ -1238,6 +1238,7 @@ static gpointer twitter_timeline_timeout_context_new(GHashTable *components)
 	return ctx;
 }
 
+
 static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 {
 	TWITTER_CHAT_TIMELINE,
@@ -1263,22 +1264,14 @@ static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 	twitter_search_timeout_context_new,
 };
 
+static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
+
 
 static TwitterEndpointChatSettings *twitter_get_endpoint_chat_settings(TwitterChatType type)
 {
-	//TODO: I hate switch statements
-	switch (type)
-	{
-		case TWITTER_CHAT_TIMELINE:
-			return &TwitterEndpointTimelineSettings;
-			break;
-		case TWITTER_CHAT_SEARCH:
-			return &TwitterEndpointSearchSettings;
-			break;
-		default:
-			return NULL;
-			break;
-	}
+	if (type >= 0 && type < TWITTER_CHAT_UNKNOWN)
+		return TwitterEndpointChatSettingsLookup[type];
+	return NULL;
 }
 static char *twitter_chat_get_name(GHashTable *components) {
 	const char *chat_type_str = g_hash_table_lookup(components, "chat_type");
@@ -2426,6 +2419,8 @@ static void twitter_init(PurplePlugin *plugin)
 
 	gtk_imhtml_class_register_protocol(TWITTER_URI "://", twitter_url_clicked_cb, twitter_context_menu);
 #endif
+	TwitterEndpointChatSettingsLookup[TwitterEndpointSearchSettings.type] = &TwitterEndpointSearchSettings;
+	TwitterEndpointChatSettingsLookup[TwitterEndpointTimelineSettings.type] = &TwitterEndpointTimelineSettings;
 
 	_twitter_protocol = plugin;
 }
