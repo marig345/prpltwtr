@@ -38,6 +38,7 @@ typedef gint (*TwitterChatSendMessageFunc)(TwitterEndpointChat *ctx, const char 
 struct _TwitterEndpointChatSettings
 {
 	int (*send_message)(TwitterEndpointChat *endpoint_chat, const gchar *message);
+	void (*endpoint_data_free)(gpointer endpoint_data);
 };
 
 struct _TwitterEndpointChat

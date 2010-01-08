@@ -987,9 +987,10 @@ static gboolean twitter_get_replies_timeout (gpointer data)
  *  Twitter search
  ******************************************************/
 
-static void twitter_search_timeout_context_free(TwitterSearchTimeoutContext *ctx)
+static void twitter_search_timeout_context_free(gpointer _ctx)
 {
-	g_return_if_fail(ctx != NULL);
+	g_return_if_fail(_ctx != NULL);
+	TwitterSearchTimeoutContext *ctx = _ctx;
 
 	twitter_endpoint_chat_free(ctx->base);
 
@@ -1004,9 +1005,10 @@ static void twitter_search_timeout_context_free(TwitterSearchTimeoutContext *ctx
 	g_slice_free (TwitterSearchTimeoutContext, ctx);
 } 
 
-static void twitter_timeline_timeout_context_free(TwitterTimelineTimeoutContext *ctx)
+static void twitter_timeline_timeout_context_free(gpointer _ctx)
 {
-	g_return_if_fail(ctx != NULL);
+	g_return_if_fail(_ctx != NULL);
+	TwitterTimelineTimeoutContext *ctx = _ctx;
 
 	twitter_endpoint_chat_free(ctx->base);
 
@@ -1153,10 +1155,12 @@ static int twitter_chat_search_send(TwitterEndpointChat *ctx_base, const gchar *
 static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 {
 	twitter_chat_timeline_send, //send_message
+	twitter_timeline_timeout_context_free, //endpoint_data_free
 };
 static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
 {
 	twitter_chat_search_send, //send_message
+	twitter_search_timeout_context_free, //endpoint_data_free
 };
 
 
@@ -1228,7 +1232,7 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 
 	g_return_val_if_fail(ctx != NULL, -1);
 
-	if (ctx->settings)
+	if (ctx->settings && ctx->settings->send_message)
 		return ctx->settings->send_message(ctx, message);
 	return -1;
 }
@@ -1866,18 +1870,9 @@ static void twitter_verify_connection(PurpleAccount *acct)
 static void _chat_contexts_value_free(gpointer value)
 {
 	TwitterEndpointChat *ctx = value;
-	if (!value)
-		return;
-	switch (ctx->type)
+	if (ctx && ctx->settings && ctx->settings->endpoint_data_free)
 	{
-		case TWITTER_CHAT_SEARCH:
-			twitter_search_timeout_context_free((TwitterSearchTimeoutContext *)ctx->endpoint_data);
-			break;
-		case TWITTER_CHAT_TIMELINE:
-			twitter_timeline_timeout_context_free((TwitterTimelineTimeoutContext *)ctx->endpoint_data);
-			break;
-		default:
-			purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown chat type %d\n", ctx->type);
+		ctx->settings->endpoint_data_free(ctx->endpoint_data);
 	}
 }
 
