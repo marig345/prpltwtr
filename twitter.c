@@ -41,28 +41,6 @@ static PurplePlugin *_twitter_protocol = NULL;
 #define TWITTER_URI_ACTION_USER		"user"
 #define TWITTER_URI_ACTION_SEARCH	"search"
 
-typedef enum
-{
-	TWITTER_CHAT_SEARCH = 0,
-	TWITTER_CHAT_TIMELINE = 1
-} TwitterChatType;
-
-typedef struct _TwitterConvChatContext TwitterConvChatContext;
-typedef void (*TwitterChatLeaveFunc)(TwitterConvChatContext *ctx);
-typedef gint (*TwitterChatSendMessageFunc)(TwitterConvChatContext *ctx, const char *message);
-
-/* When I have time, I'd like to make this event driven
- * Where there is an object with attached events when the timeout completes
- * Then depending on actions, events will be detached. If event count = 0
- * then the timer stops. That would be nice... */
-struct _TwitterConvChatContext
-{
-	TwitterChatType type;
-	PurpleAccount *account;
-	guint timer_handle;
-	gchar *chat_name;
-	gpointer endpoint_data;
-};
 
 typedef struct
 {
@@ -1008,25 +986,6 @@ static gboolean twitter_get_replies_timeout (gpointer data)
 /******************************************************
  *  Twitter search
  ******************************************************/
-static void twitter_conv_chat_context_free(TwitterConvChatContext *ctx)
-{
-	PurpleConnection *gc;
-	TwitterConnectionData *twitter;
-	gc = purple_account_get_connection(ctx->account);
-	twitter = gc->proto_data;
-
-	if (ctx->timer_handle)
-	{
-		purple_timeout_remove(ctx->timer_handle);
-		ctx->timer_handle = 0;
-	}
-	if (ctx->chat_name)
-	{
-		g_free(ctx->chat_name);
-		ctx->chat_name = NULL;
-	}
-	g_slice_free(TwitterConvChatContext, ctx);
-}
 
 static void twitter_search_timeout_context_free(TwitterSearchTimeoutContext *ctx)
 {
@@ -1191,42 +1150,30 @@ static int twitter_chat_search_send(TwitterConvChatContext *ctx_base, const gcha
 	}
 }
 
-static TwitterConvChatContext *twitter_conv_chat_context_new(
-	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,
-	gpointer endpoint_data)
-{
-	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterConnectionData *twitter = gc->proto_data;
-
-	TwitterConvChatContext *ctx = g_slice_new0(TwitterConvChatContext);
-	ctx->type = type;
-	ctx->account = account;
-	ctx->chat_name = g_strdup(chat_name);
-	ctx->endpoint_data = endpoint_data;
-
-	//Shouldn't be here
-	g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), ctx);
-
-	return ctx;
-}
 
 static TwitterSearchTimeoutContext *twitter_search_timeout_context_new(PurpleAccount *account,
 		const char *search_text, const gchar *chat_name)
 {
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
 
 	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_SEARCH, account, chat_name, ctx);
 	ctx->search_text = g_strdup(search_text);
+	g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), ctx->base); //shouldn't be here
 	return ctx;
 }
 
 static TwitterTimelineTimeoutContext *twitter_timeline_timeout_context_new(PurpleAccount *account,
 		guint timeline_id, const gchar *chat_name)
 {
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
 
 	ctx->base = twitter_conv_chat_context_new(TWITTER_CHAT_TIMELINE, account, chat_name, ctx);
 	ctx->timeline_id = timeline_id;
+	g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), ctx->base); //shouldn't be here
 	return ctx;
 }
 

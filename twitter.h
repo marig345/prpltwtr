@@ -57,3 +57,4 @@
 #include "twitter_api.h"
 #include "twitter_util.h"
 #include "twitter_xml.h"
+#include "twitter_endpoint_chat.h"
