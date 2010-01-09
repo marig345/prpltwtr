@@ -33,87 +33,7 @@
 
 static PurplePlugin *_twitter_protocol = NULL;
 
-#define TWITTER_STATUS_ONLINE   "online"
-#define TWITTER_STATUS_OFFLINE   "offline"
-
-typedef struct
-{
-	guint timeline_id;
-} TwitterTimelineTimeoutContext;
-
-typedef struct
-{
-	guint get_replies_timer;
-	guint get_friends_timer;
-	long long last_reply_id;
-	long long last_home_timeline_id;
-	long long failed_get_replies_count;
-
-	/* a table of TwitterEndpointChat
-	 * where the key will be the chat name
-	 * Alternatively, we only really need chat contexts when
-	 * we have a blist node with auto_open = TRUE or a chat
-	 * already open. So we could pass the context between the two
-	 * but that would be much more annoying to write/maintain */
-	GHashTable *chat_contexts;
-
-	/* key: gchar *screen_name,
-	 * value: gchar *reply_id (then converted to long long)
-	 * Store the id of last reply sent from any user to @me
-	 * This is used as in_reply_to_status_id
-	 * when @me sends a tweet to others */
-	GHashTable *user_reply_id_table;
-
-	gboolean requesting;
-} TwitterConnectionData;
-
-static long long purple_account_get_long_long(PurpleAccount *account, const gchar *key, long long default_value)
-{
-	const char* tmp_str;
-
-	tmp_str = purple_account_get_string(account, key, NULL);
-	if(tmp_str)
-		return strtoll(tmp_str, NULL, 10);
-	else
-		return 0;
-}
-
-static void purple_account_set_long_long(PurpleAccount *account, const gchar *key, long long value)
-{
-	gchar* tmp_str;
-
-	tmp_str = g_strdup_printf("%lld", value);
-	purple_account_set_string(account, key, tmp_str);
-	g_free(tmp_str);
-}
-
-
-//TODO: lots of copy and pasting here... let's refactor next
-static long long twitter_account_get_last_home_timeline_id(PurpleAccount *account)
-{
-	return purple_account_get_long_long(account, "twitter_last_home_timeline_id", 0);
-}
-
-static void twitter_account_set_last_home_timeline_id(PurpleAccount *account, long long reply_id)
-{
-	purple_account_set_long_long(account, "twitter_last_home_timeline_id", reply_id);
-}
-
-static long long twitter_connection_get_last_home_timeline_id(PurpleConnection *gc)
-{
-	long long reply_id = 0;
-	TwitterConnectionData *connection_data = gc->proto_data;
-	reply_id = connection_data->last_home_timeline_id;
-	return (reply_id ? reply_id : twitter_account_get_last_home_timeline_id(purple_connection_get_account(gc)));
-}
-
-static void twitter_connection_set_last_home_timeline_id(PurpleConnection *gc, long long reply_id)
-{
-	TwitterConnectionData *connection_data = gc->proto_data;
-
-	connection_data->last_home_timeline_id = reply_id;
-	twitter_account_set_last_home_timeline_id(purple_connection_get_account(gc), reply_id);
-}
+static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
 
 static long long twitter_account_get_last_reply_id(PurpleAccount *account)
 {
@@ -139,75 +59,6 @@ static void twitter_connection_set_last_reply_id(PurpleConnection *gc, long long
 
 	connection_data->last_reply_id = reply_id;
 	twitter_account_set_last_reply_id(purple_connection_get_account(gc), reply_id);
-}
-
-static void twitter_user_data_free(TwitterUserData *user_data)
-{
-	if (!user_data)
-		return;
-	if (user_data->name)
-		g_free(user_data->name);
-	if (user_data->screen_name)
-		g_free(user_data->screen_name);
-	if (user_data->profile_image_url)
-		g_free(user_data->profile_image_url);
-	if (user_data->description)
-		g_free(user_data->description);
-	g_free(user_data);
-	user_data = NULL;
-}
-
-static void twitter_status_data_free(TwitterStatusData *status)
-{
-	if (status == NULL)
-		return;
-
-	if (status->text != NULL)
-		g_free(status->text);
-	status->text = NULL;
-
-	if (status->in_reply_to_screen_name)
-		g_free (status->in_reply_to_screen_name);
-	status->in_reply_to_screen_name = NULL;
-
-	g_free(status);
-}
-
-static TwitterBuddyData *twitter_buddy_get_buddy_data(PurpleBuddy *b)
-{
-	if (b->proto_data == NULL)
-		b->proto_data = g_new0(TwitterBuddyData, 1);
-	return b->proto_data;
-}
-
-static void twitter_buddy_update_icon_cb(PurpleUtilFetchUrlData *url_data, gpointer user_data, const gchar *url_text, gsize len, const gchar *error_message)
-{
-	PurpleBuddy *buddy = user_data;
-	TwitterBuddyData *buddy_data = buddy->proto_data;
-	if (buddy_data != NULL && buddy_data->user != NULL)
-	{
-		purple_buddy_icons_set_for_user(buddy->account, buddy->name,
-				g_memdup(url_text, len), len, buddy_data->user->profile_image_url);
-	}
-}
-static void twitter_buddy_update_icon(PurpleBuddy *buddy)
-{
-	const char *previous_url = purple_buddy_icons_get_checksum_for_user(buddy);
-	TwitterBuddyData *twitter_buddy_data = buddy->proto_data;
-	if (twitter_buddy_data == NULL || twitter_buddy_data->user == NULL)
-	{
-		return;
-	} else {
-		const char *url = twitter_buddy_data->user->profile_image_url;
-		if (url == NULL)
-		{
-			purple_buddy_icons_set_for_user(buddy->account, buddy->name, NULL, 0, NULL);
-		} else {
-			if (!previous_url || !g_str_equal(previous_url, url)) {
-				purple_util_fetch_url(url, TRUE, NULL, FALSE, twitter_buddy_update_icon_cb, buddy);
-			}
-		}
-	}
 }
 
 /******************************************************
@@ -286,14 +137,6 @@ static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint 
 	return c;
 }
 
-static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
-{
-	return g_strdup("Timeline: Home");
-}
-static char *twitter_timeline_chat_name_from_components(GHashTable *components)
-{
-	return twitter_chat_name_from_timeline_id(0);
-}
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
 	PurpleGroup *g;
@@ -316,65 +159,6 @@ static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *se
 	c = purple_chat_new(account, searchtext, components);
 	purple_blist_add_chat(c, g, NULL);
 	return c;
-}
-static PurpleBuddy *twitter_buddy_new(PurpleAccount *account, const char *screenname, const char *alias)
-{
-	PurpleGroup *g;
-	PurpleBuddy *b = purple_find_buddy(account, screenname);
-	const char *group_name;
-	if (b != NULL)
-	{
-		if (b->proto_data == NULL)
-			b->proto_data = g_new0(TwitterBuddyData, 1);
-		return b;
-	}
-
-	group_name = twitter_option_buddy_group(account);
-	g = purple_find_group(group_name);
-	if (g == NULL)
-		g = purple_group_new(group_name);
-	b = purple_buddy_new(account, screenname, alias);
-	purple_blist_add_buddy(b, NULL, g, NULL);
-	b->proto_data = g_new0(TwitterBuddyData, 1);
-	return b;
-}
-
-static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData *u, gboolean add_missing_buddy)
-{
-	PurpleBuddy *b;
-	TwitterBuddyData *buddy_data;
-	if (!u || !account)
-		return;
-
-	if (!strcmp(u->screen_name, account->username))
-	{
-		twitter_user_data_free(u);
-		return;
-	}
-
-	b = purple_find_buddy(account, u->screen_name);
-	if (!b && add_missing_buddy)
-	{
-		/* set alias as screenname (name) */
-		gchar *alias = g_strdup_printf ("%s | %s", u->name, u->screen_name);
-		b = twitter_buddy_new(account, u->screen_name, alias);
-		g_free (alias);
-	}
-
-	if (!b)
-	{
-		twitter_user_data_free(u);
-		return;
-	}
-
-	buddy_data = twitter_buddy_get_buddy_data(b);
-
-	if (buddy_data == NULL)
-		return;
-	if (buddy_data->user != NULL && u != buddy_data->user)
-		twitter_user_data_free(buddy_data->user);
-	buddy_data->user = u;
-	twitter_buddy_update_icon(b);
 }
 
 
@@ -405,52 +189,6 @@ static void twitter_status_data_update_conv(PurpleAccount *account,
 			s->created_at);
 
 	g_free(tweet);
-}
-
-static void twitter_buddy_set_status_data(PurpleAccount *account, const char *src_user, TwitterStatusData *s)
-{
-	PurpleBuddy *b;
-	TwitterBuddyData *buddy_data;
-	gboolean status_text_same = FALSE;
-
-	if (!s)
-		return;
-
-	if (!s->text)
-	{
-		twitter_status_data_free(s);
-		return;
-	}
-
-
-	b = purple_find_buddy(account, src_user);
-	if (!b)
-	{
-		twitter_status_data_free(s);
-		return;
-	}
-
-	buddy_data = twitter_buddy_get_buddy_data(b);
-
-	if (buddy_data->status && s->created_at < buddy_data->status->created_at)
-	{
-		twitter_status_data_free(s);
-		return;
-	}
-
-	if (buddy_data->status != NULL && s != buddy_data->status)
-	{
-		status_text_same = (strcmp(buddy_data->status->text, s->text) == 0);
-		twitter_status_data_free(buddy_data->status);
-	}
-
-	buddy_data->status = s;
-
-	if (!status_text_same)
-	{
-		purple_prpl_got_user_status(b->account, b->name, TWITTER_STATUS_ONLINE,
-				"message", s ? s->text : NULL, NULL);
-	}
 }
 
 static void twitter_verify_connection_error_handler(PurpleAccount *account, const TwitterRequestErrorData *error_data)
@@ -610,87 +348,6 @@ static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account
 }
 
 
-static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
-		TwitterEndpointChat *endpoint_chat, GList *statuses)
-{
-	PurpleConnection *gc = purple_account_get_connection(account);
-	PurpleConvChat *chat;
-	PurpleConversation *conv;
-	PurpleChat *blist_chat;
-	GList *l;
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-
-	g_return_if_fail(account != NULL);
-
-	//TODO combine this and twitter search cb. Lots of dup code
-	conv = twitter_chat_context_find_conv(endpoint_chat);
-	if (conv == NULL && statuses && (blist_chat = twitter_find_blist_chat(account, endpoint_chat->chat_name)))
-	{
-		if (twitter_chat_auto_open(blist_chat))
-		{
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s, recreated conv for auto open chat (%s)\n", G_STRFUNC, endpoint_chat->chat_name);
-			guint chat_id = twitter_get_next_chat_id();
-			conv = serv_got_joined_chat(purple_account_get_connection(account), chat_id, endpoint_chat->chat_name);
-		}
-	}
-	g_return_if_fail (conv != NULL); //TODO: destroy context
-
-	chat = PURPLE_CONV_CHAT(conv);
-
-	for (l = statuses; l; l = l->next)
-	{
-		TwitterBuddyData *data = l->data;
-		TwitterStatusData *status = data->status;
-		TwitterUserData *user_data = data->user;
-		g_free(data);
-
-		if (!user_data)
-		{
-			twitter_status_data_free(status);
-		} else {
-			const char *screen_name = user_data->screen_name;
-			const char *text = status->text;
-			twitter_chat_add_tweet(chat, screen_name, text, status->id, status->created_at);
-			if (status->id && status->id > twitter_connection_get_last_home_timeline_id(gc))
-			{
-				twitter_connection_set_last_home_timeline_id(gc, status->id);
-			}
-			twitter_buddy_set_status_data(account, screen_name, status);
-			twitter_buddy_set_user_data(account, user_data, FALSE);
-
-			/* update user_reply_id_table table */
-			//gchar *reply_id = g_strdup_printf ("%lld", status->id);
-			//g_hash_table_insert (twitter->user_reply_id_table,
-					//g_strdup (screen_name), reply_id);
-		}
-	}
-}
-
-static void twitter_get_home_timeline_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
-{
-	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *)user_data;
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-
-	GList *statuses = twitter_statuses_node_parse(node);
-	twitter_get_home_timeline_parse_statuses(account, endpoint_chat, statuses);
-	g_list_free(statuses);
-
-}
-
-static void twitter_get_home_timeline_all_cb(PurpleAccount *account,
-		GList *nodes,
-		gpointer user_data)
-{
-	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *)user_data;
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-
-	GList *statuses = twitter_statuses_nodes_parse(nodes);
-	twitter_get_home_timeline_parse_statuses(account, endpoint_chat, statuses);
-	g_list_free(statuses);
-}
 static void twitter_get_replies_all_cb (PurpleAccount *account,
 		GList *nodes,
 		gpointer user_data)
@@ -725,94 +382,8 @@ static gboolean twitter_get_replies_timeout (gpointer data)
  *  Twitter search
  ******************************************************/
 
-static void twitter_timeline_timeout_context_free(gpointer _ctx)
-{
-	g_return_if_fail(_ctx != NULL);
-	TwitterTimelineTimeoutContext *ctx = _ctx;
-
-	g_slice_free (TwitterTimelineTimeoutContext, ctx);
-} 
 
 
-static gboolean twitter_endpoint_timeline_interval_start(TwitterEndpointChat *endpoint)
-{
-	PurpleAccount *account = endpoint->account;
-	PurpleConnection *gc = purple_account_get_connection(account);
-	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s creating new timeline context\n", account->username);
-	//TODO: free
-
-	if (since_id == 0)
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", gc->account->username);
-		twitter_api_get_home_timeline(account,
-				since_id,
-				20,
-				1,
-				twitter_get_home_timeline_cb,
-				NULL,
-				endpoint);
-	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", gc->account->username, since_id);
-		twitter_api_get_home_timeline_all(account,
-				since_id,
-				twitter_get_home_timeline_all_cb,
-				NULL,
-				endpoint);
-	}
-	return TRUE;
-}
-
-static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar *message)
-{
-	PurpleAccount *account = ctx_base->account;
-	PurpleConversation *conv = twitter_chat_context_find_conv(ctx_base);
-
-	if (conv == NULL) return -1; //TODO: error?
-
-	if (strlen(message) > MAX_TWEET_LENGTH)
-	{
-		//TODO: SHOW ERROR
-		return -1;
-	}
-	else
-	{
-		twitter_api_set_status(account,
-				message, 0,
-				NULL, NULL,//TODO: verify & error
-				NULL);
-		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, message, 0, time(NULL));//TODO: FIX TIME
-		return 0;
-	}
-}
-
-static gboolean twitter_timeline_timeout(TwitterEndpointChat *endpoint_chat)
-{
-	PurpleAccount *account = endpoint_chat->account;
-	PurpleConnection *gc = purple_account_get_connection(account);
-	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
-	if (since_id == 0)
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", account->username);
-		twitter_api_get_home_timeline(account,
-				since_id,
-				20,
-				1,
-				twitter_get_home_timeline_cb,
-				NULL,
-				endpoint_chat);
-	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", account->username, since_id);
-		twitter_api_get_home_timeline_all(account,
-				since_id,
-				twitter_get_home_timeline_all_cb,
-				NULL,
-				endpoint_chat);
-	}
-
-	return TRUE;
-}
 static gboolean twitter_interval_timeout(gpointer data)
 {
 	TwitterEndpointChat *endpoint = data;
@@ -820,29 +391,6 @@ static gboolean twitter_interval_timeout(gpointer data)
 		return endpoint->settings->interval_timeout(endpoint);
 	return FALSE;
 }
-
-static gpointer twitter_timeline_timeout_context_new(GHashTable *components)
-{
-	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
-	ctx->timeline_id = 0;
-	return ctx;
-}
-
-
-static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
-{
-	TWITTER_CHAT_TIMELINE,
-	twitter_chat_timeline_send, //send_message
-	twitter_timeline_timeout_context_free, //endpoint_data_free
-	twitter_option_search_timeout, //get_default_interval
-	twitter_timeline_chat_name_from_components, //get_name
-	NULL, //verify_components
-	twitter_timeline_timeout,
-	twitter_endpoint_timeline_interval_start,
-	twitter_timeline_timeout_context_new,
-};
-
-static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
 
 
 static TwitterEndpointChatSettings *twitter_get_endpoint_chat_settings(TwitterChatType type)
@@ -2002,8 +1550,7 @@ static void twitter_init(PurplePlugin *plugin)
 	gtk_imhtml_class_register_protocol(TWITTER_URI "://", twitter_url_clicked_cb, twitter_context_menu);
 #endif
 	twitter_init_endpoint_chat_settings(twitter_endpoint_search_get_settings());
-	//TwitterEndpointChatSettingsLookup[TwitterEndpointSearchSettings.type] = &TwitterEndpointSearchSettings;
-	//TwitterEndpointChatSettingsLookup[TwitterEndpointTimelineSettings.type] = &TwitterEndpointTimelineSettings;
+	twitter_init_endpoint_chat_settings(twitter_endpoint_timeline_get_settings());
 
 	_twitter_protocol = plugin;
 }

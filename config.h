@@ -23,3 +23,7 @@
 #define TWITTER_URI "putter"
 
 #define MAX_TWEET_LENGTH 140
+
+#define TWITTER_STATUS_ONLINE	"online"
+#define TWITTER_STATUS_OFFLINE	"offline"
+

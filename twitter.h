@@ -50,10 +50,6 @@
 #include <sslconn.h>
 #include <request.h>
 
-/* If you're using this as the basis of a prpl that will be distributed
- * separately from libpurple, remove the internal.h include below and replace
- * it with code to include your own config.h or similar.  If you're going to
- * provide for translation, you'll also need to setup the gettext macros. */
 #include "twitter_prefs.h"
 #include "twitter_request.h"
 #include "twitter_search.h"
@@ -61,6 +57,6 @@
 #include "twitter_util.h"
 #include "twitter_xml.h"
 #include "twitter_endpoint_search.h"
-//#include "twitter_endpoint_chat.h"
+#include "twitter_endpoint_timeline.h"
 
 #endif
