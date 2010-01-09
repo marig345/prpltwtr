@@ -77,12 +77,11 @@ PurpleConversation *twitter_chat_context_find_conv(TwitterEndpointChat *ctx);
 PurpleChat *twitter_blist_chat_find_search(PurpleAccount *account, const char *name);
 PurpleChat *twitter_blist_chat_find_timeline(PurpleAccount *account, gint timeline_id);
 PurpleChat *twitter_find_blist_chat(PurpleAccount *account, const char *name);
-gint twitter_get_next_chat_id();
 
 gboolean twitter_chat_auto_open(PurpleChat *chat);
 void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *message, long long id, time_t time);;
 PurpleConvChat *twitter_endpoint_chat_get_conv(TwitterEndpointChat *endpoint_chat);
-void twitter_endpoint_chat_open_conv(PurpleConnection *gc, TwitterEndpointChatSettings *settings,
+void twitter_endpoint_chat_start(PurpleConnection *gc, TwitterEndpointChatSettings *settings,
 		GHashTable *components, gboolean open_conv);
 TwitterEndpointChat *twitter_find_chat_context(PurpleAccount *account, const char *chat_name);
 gpointer twitter_find_chat_context_endpoint_data(PurpleAccount *account, const char *chat_name);

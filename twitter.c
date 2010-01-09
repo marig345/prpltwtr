@@ -454,7 +454,7 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 static void twitter_chat_join_do(PurpleConnection *gc, GHashTable *components, gboolean open_conv) {
 	const char *conv_type_str = g_hash_table_lookup(components, "chat_type");
 	gint conv_type = conv_type_str == NULL ? 0 : strtol(conv_type_str, NULL, 10);
-	twitter_endpoint_chat_open_conv(gc,
+	twitter_endpoint_chat_start(gc,
 			twitter_get_endpoint_chat_settings(conv_type),
 			components,
 			open_conv);

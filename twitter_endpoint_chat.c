@@ -1,5 +1,11 @@
 #include "twitter_endpoint_chat.h"
 
+static gint twitter_get_next_chat_id()
+{
+	static gint chat_id = 1;
+	return chat_id++;
+}
+
 void twitter_endpoint_chat_free(TwitterEndpointChat *ctx)
 {
 	PurpleConnection *gc;
@@ -129,13 +135,6 @@ PurpleChat *twitter_find_blist_chat(PurpleAccount *account, const char *name)
 }
 
 //TODO should be static?
-gint twitter_get_next_chat_id()
-{
-	static gint chat_id = 1;
-	return chat_id++;
-}
-
-//TODO should be static?
 gboolean twitter_chat_auto_open(PurpleChat *chat)
 {
 	g_return_val_if_fail(chat != NULL, FALSE);
@@ -187,7 +186,7 @@ static gboolean twitter_interval_timeout(gpointer data)
 }
 
 
-void twitter_endpoint_chat_open_conv(PurpleConnection *gc, TwitterEndpointChatSettings *settings,
+void twitter_endpoint_chat_start(PurpleConnection *gc, TwitterEndpointChatSettings *settings,
 		GHashTable *components, gboolean open_conv) 
 {
         const char *interval_str = g_hash_table_lookup(components, "interval");
