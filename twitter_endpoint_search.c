@@ -105,35 +105,27 @@ static void twitter_search_cb(PurpleAccount *account,
 	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *) user_data;
 	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) endpoint_chat->endpoint_data;
 	gint i, len = search_results->len;
-	PurpleConversation *conv;
 	PurpleConvChat *chat;
-	PurpleChat *blist_chat; //PurpleChat and PurpleConvChat... that won't get confusing
 
 	g_return_if_fail (ctx != NULL);
-	//
-	//TODO DEBUG stuff
+	//TODO add DEBUG stuff in case something breaks
 
-	conv = twitter_chat_context_find_conv(endpoint_chat);
-	if (conv == NULL && len && (blist_chat = twitter_find_blist_chat(account, endpoint_chat->chat_name)))
+	if (len)
 	{
-		if (twitter_chat_auto_open(blist_chat))
+		chat = twitter_endpoint_chat_get_conv(endpoint_chat);
+		if (chat)
 		{
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s, recreated conv for auto open chat (%s)\n", G_STRFUNC, endpoint_chat->chat_name);
-			guint chat_id = twitter_get_next_chat_id();
-			conv = serv_got_joined_chat(purple_account_get_connection(account), chat_id, endpoint_chat->chat_name);
+			for (i = len-1; i >= 0; i--) {
+				TwitterSearchData *search_data;
+
+				search_data = g_array_index (search_results,
+						TwitterSearchData *, i);
+
+				twitter_chat_add_tweet(chat, search_data->from_user, search_data->text, search_data->id, search_data->created_at);
+			}
+		} else {
+			//destroy context
 		}
-	}
-	g_return_if_fail (conv != NULL); //destroy context
-
-	chat = PURPLE_CONV_CHAT(conv);
-
-	for (i = len-1; i >= 0; i--) {
-		TwitterSearchData *search_data;
-
-		search_data = g_array_index (search_results,
-				TwitterSearchData *, i);
-
-		twitter_chat_add_tweet(chat, search_data->from_user, search_data->text, search_data->id, search_data->created_at);
 	}
 
 	ctx->last_tweet_id = max_id;

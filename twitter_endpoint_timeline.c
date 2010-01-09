@@ -75,33 +75,23 @@ static char *twitter_timeline_chat_name_from_components(GHashTable *components)
 {
 	return twitter_chat_name_from_timeline_id(0);
 }
+
+//TODO: the proper way to do this would be to have this and twitter_search return the same data type
 static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 		TwitterEndpointChat *endpoint_chat, GList *statuses)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	PurpleConvChat *chat;
-	PurpleConversation *conv;
-	PurpleChat *blist_chat;
 	GList *l;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 	g_return_if_fail(account != NULL);
 
-	//TODO combine this and twitter search cb. Lots of dup code
-	conv = twitter_chat_context_find_conv(endpoint_chat);
-	if (conv == NULL && statuses && (blist_chat = twitter_find_blist_chat(account, endpoint_chat->chat_name)))
-	{
-		if (twitter_chat_auto_open(blist_chat))
-		{
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s, recreated conv for auto open chat (%s)\n", G_STRFUNC, endpoint_chat->chat_name);
-			guint chat_id = twitter_get_next_chat_id();
-			conv = serv_got_joined_chat(purple_account_get_connection(account), chat_id, endpoint_chat->chat_name);
-		}
-	}
-	g_return_if_fail (conv != NULL); //TODO: destroy context
-
-	chat = PURPLE_CONV_CHAT(conv);
+	if (!statuses)
+		return;
+	chat = twitter_endpoint_chat_get_conv(endpoint_chat);
+	g_return_if_fail(chat != NULL); //TODO: destroy context
 
 	for (l = statuses; l; l = l->next)
 	{

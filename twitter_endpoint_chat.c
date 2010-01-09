@@ -177,3 +177,97 @@ void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *m
 			time);
 	g_free(tweet);
 }
+
+static gboolean twitter_interval_timeout(gpointer data)
+{
+	TwitterEndpointChat *endpoint = data;
+	if (endpoint->settings->interval_timeout)
+		return endpoint->settings->interval_timeout(endpoint);
+	return FALSE;
+}
+
+
+void twitter_endpoint_chat_open_conv(PurpleConnection *gc, TwitterEndpointChatSettings *settings,
+		GHashTable *components, gboolean open_conv) 
+{
+        const char *interval_str = g_hash_table_lookup(components, "interval");
+        int interval = 0;
+
+	g_return_if_fail(settings != NULL);
+
+        interval = interval_str == NULL ? 0 : strtol(interval_str, NULL, 10);
+
+	PurpleAccount *account = purple_connection_get_account(gc);
+        int default_interval = settings->get_default_interval(account);
+	gchar *error = NULL;
+
+	if (settings->verify_components && (error = settings->verify_components(components)))
+	{
+		purple_notify_info(gc,  /* plugin handle or PurpleConnection */
+				("Chat Join"),
+				("Invalid Chat"),
+				(error));
+		g_free(error);
+		return;
+	}
+
+        if (interval < 1)
+                interval = default_interval;
+
+	char *chat_name = settings->get_name(components);
+
+        if (!purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)) {
+		if (open_conv)
+		{
+			guint chat_id = twitter_get_next_chat_id();
+			serv_got_joined_chat(gc, chat_id, chat_name);
+		}
+		if (!twitter_find_chat_context(account, chat_name))
+		{
+			TwitterConnectionData *twitter = gc->proto_data;
+			TwitterEndpointChat *endpoint_chat = twitter_endpoint_chat_new(
+					settings, settings->type, account, chat_name, components);
+			g_hash_table_insert(twitter->chat_contexts, g_strdup(chat_name), endpoint_chat);
+			settings->on_start(endpoint_chat);
+
+			endpoint_chat->timer_handle = purple_timeout_add_seconds(
+					60 * interval,
+					twitter_interval_timeout, endpoint_chat);
+		}
+        } else {
+                purple_debug_info(TWITTER_PROTOCOL_ID, "Chat %s is already open.", chat_name);
+        }
+	g_free(chat_name);
+}
+
+TwitterEndpointChat *twitter_find_chat_context(PurpleAccount *account, const char *chat_name)
+{
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
+	return (TwitterEndpointChat *) g_hash_table_lookup(twitter->chat_contexts, chat_name);
+}
+gpointer twitter_find_chat_context_endpoint_data(PurpleAccount *account, const char *chat_name)
+{
+	TwitterEndpointChat *ctx_base = twitter_find_chat_context(account, chat_name);
+	if (!ctx_base)
+		return NULL;
+	return ctx_base->endpoint_data;
+}
+
+PurpleConvChat *twitter_endpoint_chat_get_conv(TwitterEndpointChat *endpoint_chat)
+{
+	PurpleConversation *conv = twitter_chat_context_find_conv(endpoint_chat);
+	PurpleChat *blist_chat;
+	if (conv == NULL && (blist_chat = twitter_find_blist_chat(endpoint_chat->account, endpoint_chat->chat_name)))
+	{
+		if (twitter_chat_auto_open(blist_chat))
+		{
+			purple_debug_info(TWITTER_PROTOCOL_ID, "%s, recreated conv for auto open chat (%s)\n", G_STRFUNC, endpoint_chat->chat_name);
+			guint chat_id = twitter_get_next_chat_id();
+			conv = serv_got_joined_chat(purple_account_get_connection(endpoint_chat->account), chat_id, endpoint_chat->chat_name);
+		}
+	}
+	if (!conv)
+		return NULL;
+	return PURPLE_CONV_CHAT(conv);
+}
