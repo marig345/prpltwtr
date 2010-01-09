@@ -61,6 +61,7 @@ static void twitter_connection_set_last_reply_id(PurpleConnection *gc, long long
 	twitter_account_set_last_reply_id(purple_connection_get_account(gc), reply_id);
 }
 
+
 /******************************************************
  *  Chat
  ******************************************************/

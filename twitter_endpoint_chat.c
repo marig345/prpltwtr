@@ -144,3 +144,36 @@ gboolean twitter_chat_auto_open(PurpleChat *chat)
 	return (auto_open != NULL && auto_open[0] != '0');
 }
 
+void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *message, long long id, time_t time)
+{
+	gchar *tweet;
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+	g_return_if_fail(chat != NULL);
+	g_return_if_fail(who != NULL);
+	g_return_if_fail(message != NULL);
+
+	tweet = twitter_format_tweet(
+			purple_conversation_get_account(purple_conv_chat_get_conversation(chat)),
+			who,
+			message,
+			id);
+	if (!purple_conv_chat_find_user(chat, who))
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "added %s to chat %s\n",
+				who,
+				purple_conversation_get_name(purple_conv_chat_get_conversation(chat)));
+		purple_conv_chat_add_user(chat,
+				who,
+				NULL,   /* user-provided join message, IRC style */
+				PURPLE_CBFLAGS_NONE,
+				FALSE);  /* show a join message */
+	}
+	purple_debug_info(TWITTER_PROTOCOL_ID, "message %s\n", message);
+	serv_got_chat_in(purple_conversation_get_gc(purple_conv_chat_get_conversation(chat)),
+			purple_conv_chat_get_id(chat),
+			who,
+			PURPLE_MESSAGE_RECV,
+			tweet,
+			time);
+	g_free(tweet);
+}

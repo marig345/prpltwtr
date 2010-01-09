@@ -77,6 +77,8 @@ PurpleChat *twitter_blist_chat_find_search(PurpleAccount *account, const char *n
 PurpleChat *twitter_blist_chat_find_timeline(PurpleAccount *account, gint timeline_id);
 PurpleChat *twitter_find_blist_chat(PurpleAccount *account, const char *name);
 gint twitter_get_next_chat_id();
+
 gboolean twitter_chat_auto_open(PurpleChat *chat);
+void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *message, long long id, time_t time);;
 
 #endif

@@ -9,23 +9,8 @@
 #include <glib.h>
 
 #include <account.h>
-#include <accountopt.h>
-#include <blist.h>
-#include <cmds.h>
-#include <conversation.h>
-#include <connection.h>
 #include <debug.h>
-#include <notify.h>
-#include <privacy.h>
-#include <prpl.h>
-#include <roomlist.h>
-#include <status.h>
 #include <util.h>
-#include <version.h>
-#include <cipher.h>
-#include <sslconn.h>
-#include <request.h>
-
 //#include "twitter_util.h" //TODO fix me
 
 typedef struct 

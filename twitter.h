@@ -50,13 +50,15 @@
 #include <sslconn.h>
 #include <request.h>
 
+#include "twitter_xml.h"
 #include "twitter_prefs.h"
 #include "twitter_request.h"
 #include "twitter_search.h"
 #include "twitter_api.h"
 #include "twitter_util.h"
-#include "twitter_xml.h"
 #include "twitter_endpoint_search.h"
 #include "twitter_endpoint_timeline.h"
+#include "twitter_buddy.h"
+#include "twitter_conn.h"
 
 #endif

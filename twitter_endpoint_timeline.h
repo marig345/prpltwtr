@@ -31,6 +31,8 @@
 #include "twitter_api.h"
 #include "twitter_prefs.h"
 #include "twitter_xml.h"
+#include "twitter_buddy.h"
+#include "twitter_conn.h"
 #include "twitter_util.h" //TODO remove
 
 typedef struct
