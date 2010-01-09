@@ -177,7 +177,7 @@ void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *m
 	g_free(tweet);
 }
 
-static gboolean twitter_interval_timeout(gpointer data)
+static gboolean twitter_endpoint_chat_interval_timeout(gpointer data)
 {
 	TwitterEndpointChat *endpoint = data;
 	if (endpoint->settings->interval_timeout)
@@ -231,7 +231,7 @@ void twitter_endpoint_chat_start(PurpleConnection *gc, TwitterEndpointChatSettin
 
 			endpoint_chat->timer_handle = purple_timeout_add_seconds(
 					60 * interval,
-					twitter_interval_timeout, endpoint_chat);
+					twitter_endpoint_chat_interval_timeout, endpoint_chat);
 		}
         } else {
                 purple_debug_info(TWITTER_PROTOCOL_ID, "Chat %s is already open.", chat_name);
