@@ -1,3 +1,6 @@
+#ifndef _TWITTER_XML_H_
+#define _TWITTER_XML_H_
+
 #include "config.h"
 
 #include <stdarg.h>
@@ -22,6 +25,7 @@
 #include <cipher.h>
 #include <sslconn.h>
 #include <request.h>
+
 #include "twitter_util.h"
 
 typedef struct 
@@ -55,3 +59,5 @@ GList *twitter_users_node_parse(xmlnode *users_node);
 GList *twitter_users_nodes_parse(GList *nodes);
 GList *twitter_statuses_node_parse(xmlnode *statuses_node);
 GList *twitter_statuses_nodes_parse(GList *nodes);
+
+#endif

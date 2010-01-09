@@ -21,3 +21,5 @@
 
 /* We'll handle TWITTER_URI://foo as an internal action */
 #define TWITTER_URI "putter"
+
+#define MAX_TWEET_LENGTH 140

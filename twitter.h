@@ -21,6 +21,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02111-1301  USA
  */
+
+#ifndef _TWITTER_H_
+#define _TWITTER_H_
 #include "config.h"
 
 #include <stdarg.h>
@@ -57,4 +60,7 @@
 #include "twitter_api.h"
 #include "twitter_util.h"
 #include "twitter_xml.h"
-#include "twitter_endpoint_chat.h"
+#include "twitter_endpoint_search.h"
+//#include "twitter_endpoint_chat.h"
+
+#endif

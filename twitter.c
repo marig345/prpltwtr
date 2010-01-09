@@ -36,20 +36,6 @@ static PurplePlugin *_twitter_protocol = NULL;
 #define TWITTER_STATUS_ONLINE   "online"
 #define TWITTER_STATUS_OFFLINE   "offline"
 
-#define MAX_TWEET_LENGTH 140
-
-#define TWITTER_URI_ACTION_USER		"user"
-#define TWITTER_URI_ACTION_SEARCH	"search"
-
-
-typedef struct
-{
-	gchar *search_text; /* e.g. N900 */
-	gchar *refresh_url; /* e.g. ?since_id=6276370030&q=n900 */
-
-	long long last_tweet_id;
-} TwitterSearchTimeoutContext;
-
 typedef struct
 {
 	guint timeline_id;
@@ -265,73 +251,6 @@ GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_na
 	return defaults;
 }
 
-//Taken mostly from blist.c
-static PurpleChat *_twitter_blist_chat_find(PurpleAccount *account, TwitterChatType chat_type,
-	const char *component_key, const char *component_value)
-{
-	const char *node_chat_name;
-	gint node_chat_type = 0;
-	const char *node_chat_type_str;
-	PurpleChat *chat;
-	PurpleBlistNode *node, *group;
-	char *normname;
-	PurpleBuddyList *purplebuddylist = purple_get_blist();
-	GHashTable *components;
-
-	g_return_val_if_fail(purplebuddylist != NULL, NULL);
-	g_return_val_if_fail((component_value != NULL) && (*component_value != '\0'), NULL);
-
-	normname = g_strdup(purple_normalize(account, component_value));
-	purple_debug_info(TWITTER_PROTOCOL_ID, "Account %s searching for chat %s type %d\n",
-		account->username,
-		component_value == NULL ? "NULL" : component_value,
-		chat_type);
-
-	if (normname == NULL)
-	{
-		return NULL;
-	}
-	for (group = purplebuddylist->root; group != NULL; group = group->next) {
-		for (node = group->child; node != NULL; node = node->next) {
-			if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
-
-				chat = (PurpleChat*)node;
-
-				if (account != chat->account)
-					continue;
-
-				components = purple_chat_get_components(chat);
-				if (components != NULL)
-				{
-					node_chat_type_str = g_hash_table_lookup(components, "chat_type");
-					node_chat_name = g_hash_table_lookup(components, component_key);
-					node_chat_type = node_chat_type_str == NULL ? 0 : strtol(node_chat_type_str, NULL, 10);
-
-					if (node_chat_name != NULL && node_chat_type == chat_type && !strcmp(purple_normalize(account, node_chat_name), normname))
-					{
-						g_free(normname);
-						return chat;
-					}
-				}
-			}
-		}
-	}
-
-	g_free(normname);
-	return NULL;
-}
-
-static PurpleChat *twitter_blist_chat_find_search(PurpleAccount *account, const char *name)
-{
-	return _twitter_blist_chat_find(account, TWITTER_CHAT_SEARCH, "search", name);
-}
-static PurpleChat *twitter_blist_chat_find_timeline(PurpleAccount *account, gint timeline_id)
-{
-	char *tmp = g_strdup_printf("%d", timeline_id);
-	PurpleChat *chat = _twitter_blist_chat_find(account, TWITTER_CHAT_TIMELINE, "timeline_id", tmp);
-	g_free(tmp);
-	return chat;
-}
 
 static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint timeline_id)
 {
@@ -367,30 +286,6 @@ static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint 
 	return c;
 }
 
-PurpleChat *twitter_find_blist_chat(PurpleAccount *account, const char *name)
-{
-	static char *timeline = "Timeline: ";
-	static char *search = "Search: ";
-	PurpleChat *c = NULL;
-	if (strlen(name) > strlen(timeline) && !strncmp(timeline, name, strlen(timeline)))
-	{
-		c = twitter_blist_chat_find_timeline(account, 0);
-	} else if (strlen(name) > strlen(search) && !strncmp(search, name, strlen(search))) {
-		c = twitter_blist_chat_find_search(account, name + strlen(search));
-	} else {
-		c = twitter_blist_chat_find_search(account, name);
-	}
-	return c;
-}
-
-static char *twitter_chat_name_from_search(const char *search)
-{
-	char *search_lower = g_utf8_strdown(search, -1);
-	char *chat_name = g_strdup_printf("Search: %s", search_lower);
-	g_free(search_lower);
-	return chat_name;
-}
-
 static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
 {
 	return g_strdup("Timeline: Home");
@@ -399,12 +294,6 @@ static char *twitter_timeline_chat_name_from_components(GHashTable *components)
 {
 	return twitter_chat_name_from_timeline_id(0);
 }
-static char *twitter_search_chat_name_from_components(GHashTable *components)
-{
-	const char *search = g_hash_table_lookup(components, "search");
-	return twitter_chat_name_from_search(search);
-}
-
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
 	PurpleGroup *g;
@@ -488,94 +377,7 @@ static void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData 
 	twitter_buddy_update_icon(b);
 }
 
-#if _HAVE_PIDGIN_
-static const char *_find_first_delimiter(const char *text, const char *delimiters, int *delim_id)
-{
-	const char *delimiter;
-	if (text == NULL || text[0] == '\0')
-		return NULL;
-	do
-	{
-		for (delimiter = delimiters; *delimiter != '\0'; delimiter++)
-		{
-			if (*text == *delimiter)
-			{
-				if (delim_id != NULL)
-					*delim_id = delimiter - delimiters;
-				return text;
-			}
-		}
-	} while (*++text != '\0');
-	return NULL;
-}
-#endif
 
-static const char *twitter_linkify(PurpleAccount *account, const char *message)
-{
-#if _HAVE_PIDGIN_
-	GString *ret;
-	static char symbols[] = "#@";
-	static char *symbol_actions[] = {TWITTER_URI_ACTION_SEARCH, TWITTER_URI_ACTION_USER};
-	static char delims[] = " :"; //I don't know if this is how I want to do this...
-	const char *ptr = message;
-	const char *end = message + strlen(message);
-	const char *delim = NULL;
-	g_return_val_if_fail(message != NULL, NULL);
-
-	ret = g_string_new("");
-
-	while (ptr != NULL && ptr < end)
-	{
-		const char *first_token = NULL;
-		char *current_action = NULL;
-		char *link_text = NULL;
-		int symbol_index = 0;
-		first_token = _find_first_delimiter(ptr, symbols, &symbol_index);
-		if (first_token == NULL)
-		{
-			g_string_append(ret, ptr);
-			break;
-		}
-		current_action = symbol_actions[symbol_index];
-		g_string_append_len(ret, ptr, first_token - ptr);
-		ptr = first_token;
-		delim = _find_first_delimiter(ptr, delims, NULL);
-		if (delim == NULL)
-			delim = end;
-		link_text = g_strndup(ptr, delim - ptr);
-		//Added the 'a' before the account name because of a highlighting issue... ugly hack
-		g_string_append_printf(ret, "<a href=\"" TWITTER_URI ":///%s?account=a%s&text=%s\">%s</a>",
-				current_action,
-				purple_account_get_username(account),
-				purple_url_encode(link_text),
-				purple_markup_escape_text(link_text, -1));
-		ptr = delim;
-	}
-
-	return g_string_free(ret, FALSE);
-#else
-	return message;
-#endif
-}
-
-static char *twitter_format_tweet(PurpleAccount *account, const char *src_user, const char *message, long long id)
-{
-	const char *linkified_message = twitter_linkify(account, message);
-	gboolean add_link = twitter_option_add_link_to_tweet(account);
-
-	g_return_val_if_fail(linkified_message != NULL, NULL);
-	g_return_val_if_fail(src_user != NULL, NULL);
-
-	if (add_link && id) {
-		return g_strdup_printf("%s\nhttp://twitter.com/%s/status/%lld\n",
-				linkified_message,
-				src_user,
-				id);
-	}
-	else {
-		return g_strdup_printf("%s", linkified_message);
-	}
-}
 
 static void twitter_status_data_update_conv(PurpleAccount *account,
 		char *src_user,
@@ -807,58 +609,6 @@ static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account
 	return FALSE;
 }
 
-static void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *message, long long id, time_t time)
-{
-	gchar *tweet;
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-	g_return_if_fail(chat != NULL);
-	g_return_if_fail(who != NULL);
-	g_return_if_fail(message != NULL);
-
-	tweet = twitter_format_tweet(
-			purple_conversation_get_account(purple_conv_chat_get_conversation(chat)),
-			who,
-			message,
-			id);
-	if (!purple_conv_chat_find_user(chat, who))
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "added %s to chat %s\n",
-				who,
-				purple_conversation_get_name(purple_conv_chat_get_conversation(chat)));
-		purple_conv_chat_add_user(chat,
-				who,
-				NULL,   /* user-provided join message, IRC style */
-				PURPLE_CBFLAGS_NONE,
-				FALSE);  /* show a join message */
-	}
-	purple_debug_info(TWITTER_PROTOCOL_ID, "message %s\n", message);
-	serv_got_chat_in(purple_conversation_get_gc(purple_conv_chat_get_conversation(chat)),
-			purple_conv_chat_get_id(chat),
-			who,
-			PURPLE_MESSAGE_RECV,
-			tweet,
-			time);
-	g_free(tweet);
-}
-
-static PurpleConversation *twitter_chat_context_find_conv(TwitterEndpointChat *ctx)
-{
-	return purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, ctx->chat_name, ctx->account);
-}
-
-static gboolean twitter_chat_auto_open(PurpleChat *chat)
-{
-	g_return_val_if_fail(chat != NULL, FALSE);
-	GHashTable *components = purple_chat_get_components(chat);
-	char *auto_open = g_hash_table_lookup(components, "auto_open");
-	return (auto_open != NULL && auto_open[0] != '0');
-}
-
-static gint twitter_get_next_chat_id()
-{
-	static gint chat_id = 1;
-	return chat_id++;
-}
 
 static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 		TwitterEndpointChat *endpoint_chat, GList *statuses)
@@ -975,25 +725,6 @@ static gboolean twitter_get_replies_timeout (gpointer data)
  *  Twitter search
  ******************************************************/
 
-static void twitter_search_timeout_context_free(gpointer _ctx)
-{
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-	g_return_if_fail(_ctx != NULL);
-	TwitterSearchTimeoutContext *ctx = _ctx;
-
-	ctx->last_tweet_id = 0;
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s %s\n", G_STRFUNC, ctx->search_text);
-	g_free (ctx->search_text);
-	ctx->search_text = NULL;
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s %s\n", G_STRFUNC, ctx->refresh_url);
-	g_free (ctx->refresh_url);
-	ctx->refresh_url = NULL;
-
-	g_slice_free (TwitterSearchTimeoutContext, ctx);
-} 
-
 static void twitter_timeline_timeout_context_free(gpointer _ctx)
 {
 	g_return_if_fail(_ctx != NULL);
@@ -1002,89 +733,7 @@ static void twitter_timeline_timeout_context_free(gpointer _ctx)
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
 
-static void twitter_search_cb(PurpleAccount *account,
-		const GArray *search_results,
-		const gchar *refresh_url,
-		long long max_id,
-		gpointer user_data)
-{
-	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *) user_data;
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) endpoint_chat->endpoint_data;
-	gint i, len = search_results->len;
-	PurpleConversation *conv;
-	PurpleConvChat *chat;
-	PurpleChat *blist_chat; //PurpleChat and PurpleConvChat... that won't get confusing
 
-	g_return_if_fail (ctx != NULL);
-	//
-	//TODO DEBUG stuff
-
-	conv = twitter_chat_context_find_conv(endpoint_chat);
-	if (conv == NULL && len && (blist_chat = twitter_find_blist_chat(account, endpoint_chat->chat_name)))
-	{
-		if (twitter_chat_auto_open(blist_chat))
-		{
-			purple_debug_info(TWITTER_PROTOCOL_ID, "%s, recreated conv for auto open chat (%s)\n", G_STRFUNC, endpoint_chat->chat_name);
-			guint chat_id = twitter_get_next_chat_id();
-			conv = serv_got_joined_chat(purple_account_get_connection(account), chat_id, endpoint_chat->chat_name);
-		}
-	}
-	g_return_if_fail (conv != NULL); //destroy context
-
-	chat = PURPLE_CONV_CHAT(conv);
-
-	for (i = len-1; i >= 0; i--) {
-		TwitterSearchData *search_data;
-
-		search_data = g_array_index (search_results,
-				TwitterSearchData *, i);
-
-		twitter_chat_add_tweet(chat, search_data->from_user, search_data->text, search_data->id, search_data->created_at);
-	}
-
-	ctx->last_tweet_id = max_id;
-	g_free (ctx->refresh_url);
-	ctx->refresh_url = g_strdup (refresh_url);
-}
-
-static gboolean twitter_search_timeout(TwitterEndpointChat *endpoint_chat)
-{
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *)endpoint_chat->endpoint_data;
-
-	if (ctx->refresh_url) {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, refresh_url exists: %s\n",
-				G_STRFUNC, ctx->refresh_url);
-
-		twitter_api_search_refresh(endpoint_chat->account, ctx->refresh_url,
-				twitter_search_cb, NULL, endpoint_chat);
-	}
-	else {
-		gchar *refresh_url;
-
-		refresh_url = g_strdup_printf ("?q=%s&since_id=%lld",
-				purple_url_encode(ctx->search_text), ctx->last_tweet_id);
-
-		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, create refresh_url: %s\n",
-				G_STRFUNC, refresh_url);
-
-		twitter_api_search_refresh (endpoint_chat->account, refresh_url,
-				twitter_search_cb, NULL, endpoint_chat);
-
-		g_free (refresh_url);
-	}
-
-	return TRUE;
-}
-
-static gboolean twitter_endpoint_search_interval_start(TwitterEndpointChat *endpoint)
-{
-	TwitterSearchTimeoutContext *ctx = endpoint->endpoint_data;
-	twitter_api_search(endpoint->account,
-			ctx->search_text, ctx->last_tweet_id,
-			TWITTER_SEARCH_RPP_DEFAULT,
-			twitter_search_cb, NULL, endpoint);
-	return TRUE;
-}
 static gboolean twitter_endpoint_timeline_interval_start(TwitterEndpointChat *endpoint)
 {
 	PurpleAccount *account = endpoint->account;
@@ -1138,57 +787,6 @@ static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar
 	}
 }
 
-static int twitter_chat_search_send(TwitterEndpointChat *ctx_base, const gchar *message)
-{
-	PurpleAccount *account = ctx_base->account;
-	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) ctx_base->endpoint_data;
-	PurpleConversation *conv = twitter_chat_context_find_conv(ctx_base);
-	char *status;
-	char *message_lower, *search_text_lower;
-
-	if (conv == NULL) return -1; //TODO: error?
-
-	//TODO: verify that we want utf8 case insensitive, and not ascii
-	message_lower = g_utf8_strdown(message, -1);
-	search_text_lower = g_utf8_strdown(ctx->search_text, -1);
-	if (strstr(message_lower, search_text_lower))
-	{
-		status = g_strdup(message);
-	} else {
-		status = g_strdup_printf("%s %s", ctx->search_text, message);
-	}
-	g_free(message_lower);
-	g_free(search_text_lower);
-
-	if (strlen(status) > MAX_TWEET_LENGTH)
-	{
-		//TODO: SHOW ERROR
-		g_free(status);
-		return -1;
-	}
-	else
-	{
-		PurpleAccount *account = purple_connection_get_account(gc);
-		twitter_api_set_status(purple_connection_get_account(gc),
-				status, 0,
-				NULL, NULL,//TODO: verify & error
-				NULL);
-		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, status, 0, time(NULL));//TODO: FIX TIME
-		g_free(status);
-		return 0;
-	}
-}
-static gchar *twitter_search_verify_components(GHashTable *components)
-{
-	const char *search = g_hash_table_lookup(components, "search");
-	if (search == NULL || search[0] == '\0')
-	{
-		return g_strdup("Search must be filled in when joining a search chat");
-	}
-	return NULL;
-}
-
 static gboolean twitter_timeline_timeout(TwitterEndpointChat *endpoint_chat)
 {
 	PurpleAccount *account = endpoint_chat->account;
@@ -1223,14 +821,6 @@ static gboolean twitter_interval_timeout(gpointer data)
 	return FALSE;
 }
 
-static gpointer twitter_search_timeout_context_new(GHashTable *components)
-{
-	TwitterSearchTimeoutContext *ctx = g_slice_new0(TwitterSearchTimeoutContext);
-	ctx->search_text = g_strdup(g_hash_table_lookup(components, "search"));
-	ctx->refresh_url = NULL;
-	return ctx;
-}
-
 static gpointer twitter_timeline_timeout_context_new(GHashTable *components)
 {
 	TwitterTimelineTimeoutContext *ctx = g_slice_new0(TwitterTimelineTimeoutContext);
@@ -1250,18 +840,6 @@ static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 	twitter_timeline_timeout,
 	twitter_endpoint_timeline_interval_start,
 	twitter_timeline_timeout_context_new,
-};
-static TwitterEndpointChatSettings TwitterEndpointSearchSettings =
-{
-	TWITTER_CHAT_SEARCH,
-	twitter_chat_search_send, //send_message
-	twitter_search_timeout_context_free, //endpoint_data_free
-	twitter_option_timeline_timeout, //get_default_interval
-	twitter_search_chat_name_from_components, //get_name
-	twitter_search_verify_components, //verify_components
-	twitter_search_timeout, //interval_timeout
-	twitter_endpoint_search_interval_start,
-	twitter_search_timeout_context_new,
 };
 
 static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
@@ -2405,6 +1983,10 @@ static gboolean twitter_context_menu(GtkIMHtml *imhtml, GtkIMHtmlLink *link, Gtk
 }
 #endif
 
+static void twitter_init_endpoint_chat_settings(TwitterEndpointChatSettings *settings)
+{
+	TwitterEndpointChatSettingsLookup[settings->type] = settings;
+}
 
 static void twitter_init(PurplePlugin *plugin)
 {
@@ -2419,8 +2001,9 @@ static void twitter_init(PurplePlugin *plugin)
 
 	gtk_imhtml_class_register_protocol(TWITTER_URI "://", twitter_url_clicked_cb, twitter_context_menu);
 #endif
-	TwitterEndpointChatSettingsLookup[TwitterEndpointSearchSettings.type] = &TwitterEndpointSearchSettings;
-	TwitterEndpointChatSettingsLookup[TwitterEndpointTimelineSettings.type] = &TwitterEndpointTimelineSettings;
+	twitter_init_endpoint_chat_settings(twitter_endpoint_search_get_settings());
+	//TwitterEndpointChatSettingsLookup[TwitterEndpointSearchSettings.type] = &TwitterEndpointSearchSettings;
+	//TwitterEndpointChatSettingsLookup[TwitterEndpointTimelineSettings.type] = &TwitterEndpointTimelineSettings;
 
 	_twitter_protocol = plugin;
 }

@@ -1,3 +1,6 @@
+#ifndef _TWITTER_ENDPOINT_CHAT_H_
+#define _TWITTER_ENDPOINT_CHAT_H_
+
 #include "config.h"
 
 #include <stdarg.h>
@@ -68,3 +71,12 @@ TwitterEndpointChat *twitter_endpoint_chat_new(
 
 void twitter_endpoint_chat_free(TwitterEndpointChat *ctx);
 
+PurpleConversation *twitter_chat_context_find_conv(TwitterEndpointChat *ctx);
+
+PurpleChat *twitter_blist_chat_find_search(PurpleAccount *account, const char *name);
+PurpleChat *twitter_blist_chat_find_timeline(PurpleAccount *account, gint timeline_id);
+PurpleChat *twitter_find_blist_chat(PurpleAccount *account, const char *name);
+gint twitter_get_next_chat_id();
+gboolean twitter_chat_auto_open(PurpleChat *chat);
+
+#endif
