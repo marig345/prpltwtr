@@ -65,6 +65,18 @@ struct _TwitterEndpointChat
 	gpointer endpoint_data;
 };
 
+//Identifier to use for multithreading
+//TODO this will (probably) stll cause crashes if an account is destroyed while doing multithreading
+typedef struct
+{
+	PurpleAccount *account;
+	gchar *chat_name;
+} TwitterEndpointChatId;
+
+TwitterEndpointChatId *twitter_endpoint_chat_id_new(TwitterEndpointChat *chat);
+void twitter_endpoint_chat_id_free(TwitterEndpointChatId *chat_id);
+TwitterEndpointChat *twitter_endpoint_chat_find_by_id(TwitterEndpointChatId *chat_id);
+
 TwitterEndpointChat *twitter_endpoint_chat_new(
 	TwitterEndpointChatSettings *settings,
 	TwitterChatType type, PurpleAccount *account, const gchar *chat_name,

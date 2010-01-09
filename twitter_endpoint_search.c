@@ -102,10 +102,20 @@ static void twitter_search_cb(PurpleAccount *account,
 		long long max_id,
 		gpointer user_data)
 {
-	TwitterEndpointChat *endpoint_chat = (TwitterEndpointChat *) user_data;
-	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *) endpoint_chat->endpoint_data;
+	TwitterEndpointChatId *id = (TwitterEndpointChatId *) user_data;
 	gint i, len = search_results->len;
 	PurpleConvChat *chat;
+	TwitterEndpointChat *endpoint_chat;
+	TwitterSearchTimeoutContext *ctx;
+
+	g_return_if_fail(id != NULL);
+
+	endpoint_chat = twitter_endpoint_chat_find_by_id(id);
+	twitter_endpoint_chat_id_free(id);
+
+	if (endpoint_chat == NULL)
+		return;
+	ctx = (TwitterSearchTimeoutContext *) endpoint_chat->endpoint_data;
 
 	g_return_if_fail (ctx != NULL);
 	//TODO add DEBUG stuff in case something breaks
@@ -125,6 +135,7 @@ static void twitter_search_cb(PurpleAccount *account,
 			}
 		} else {
 			//destroy context
+			return;
 		}
 	}
 
@@ -136,23 +147,25 @@ static void twitter_search_cb(PurpleAccount *account,
 static gboolean twitter_endpoint_search_interval_start(TwitterEndpointChat *endpoint)
 {
 	TwitterSearchTimeoutContext *ctx = endpoint->endpoint_data;
+	TwitterEndpointChatId *id = twitter_endpoint_chat_id_new(endpoint);
 	twitter_api_search(endpoint->account,
 			ctx->search_text, ctx->last_tweet_id,
 			TWITTER_SEARCH_RPP_DEFAULT,
-			twitter_search_cb, NULL, endpoint);
+			twitter_search_cb, NULL, id);
 	return TRUE;
 }
 
 static gboolean twitter_search_timeout(TwitterEndpointChat *endpoint_chat)
 {
 	TwitterSearchTimeoutContext *ctx = (TwitterSearchTimeoutContext *)endpoint_chat->endpoint_data;
+	TwitterEndpointChatId *id = twitter_endpoint_chat_id_new(endpoint_chat);
 
 	if (ctx->refresh_url) {
 		purple_debug_info(TWITTER_PROTOCOL_ID, "%s, refresh_url exists: %s\n",
 				G_STRFUNC, ctx->refresh_url);
 
 		twitter_api_search_refresh(endpoint_chat->account, ctx->refresh_url,
-				twitter_search_cb, NULL, endpoint_chat);
+				twitter_search_cb, NULL, id);
 	}
 	else {
 		gchar *refresh_url;
@@ -164,7 +177,7 @@ static gboolean twitter_search_timeout(TwitterEndpointChat *endpoint_chat)
 				G_STRFUNC, refresh_url);
 
 		twitter_api_search_refresh (endpoint_chat->account, refresh_url,
-				twitter_search_cb, NULL, endpoint_chat);
+				twitter_search_cb, NULL, id);
 
 		g_free (refresh_url);
 	}

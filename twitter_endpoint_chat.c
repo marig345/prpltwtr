@@ -43,6 +43,30 @@ TwitterEndpointChat *twitter_endpoint_chat_new(
 
 	return ctx;
 }
+TwitterEndpointChatId *twitter_endpoint_chat_id_new(TwitterEndpointChat *chat)
+{
+	TwitterEndpointChatId *chat_id;
+	g_return_val_if_fail(chat != NULL, NULL);
+
+	chat_id = g_slice_new0(TwitterEndpointChatId);
+	chat_id->account = chat->account;
+	chat_id->chat_name = g_strdup(chat->chat_name);
+	return chat_id;
+}
+void twitter_endpoint_chat_id_free(TwitterEndpointChatId *chat_id)
+{
+	if (chat_id == NULL)
+		return;
+	g_free(chat_id->chat_name);
+	chat_id->chat_name = NULL;
+
+	g_slice_free(TwitterEndpointChatId, chat_id);
+}
+TwitterEndpointChat *twitter_endpoint_chat_find_by_id(TwitterEndpointChatId *chat_id)
+{
+	g_return_val_if_fail(chat_id != NULL, NULL);
+	return twitter_find_chat_context(chat_id->account, chat_id->chat_name);
+}
 
 PurpleConversation *twitter_chat_context_find_conv(TwitterEndpointChat *ctx)
 {
