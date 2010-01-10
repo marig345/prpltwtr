@@ -516,10 +516,19 @@ static void conversation_created_cb(PurpleConversation *conv, PurpleAccount *acc
 	{
 		GHashTable *components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
 		g_hash_table_insert(components, "search", g_strdup(name + 1));
+		g_hash_table_insert(components, "chat_type", g_strdup_printf("%d", TWITTER_CHAT_SEARCH));
 		twitter_endpoint_chat_start(purple_account_get_connection(account),
 				twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH),
 				components,
 				 TRUE) ;
+	} else if (!strcmp(name, "Timeline: Home")) {
+		GHashTable *components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
+		g_hash_table_insert(components, "timeline_id", g_strdup("0"));
+		g_hash_table_insert(components, "chat_type", g_strdup_printf("%d", TWITTER_CHAT_TIMELINE)); //i don't think this is needed
+		twitter_endpoint_chat_start(purple_account_get_connection(account),
+				twitter_get_endpoint_chat_settings(TWITTER_CHAT_TIMELINE),
+				components,
+				TRUE) ;
 	}
 }
 
@@ -529,7 +538,7 @@ static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *ac
 
 	g_return_if_fail(name != NULL && name[0] != '\0');
 
-	if (name[0] == '#')
+	if (name[0] == '#' || !strcmp(name, "Timeline: Home"))
 	{
 		PurpleConnection *gc = purple_conversation_get_gc(conv);
 		TwitterConnectionData *twitter = gc->proto_data;
