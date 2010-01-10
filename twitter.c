@@ -104,6 +104,12 @@ GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_na
 }
 
 
+#if _HAZE_
+static PurpleBuddy *twitter_blist_chat_timeline_new(PurpleAccount *account, gint timeline_id)
+{
+	return twitter_buddy_new(account, "Timeline: Home", "Timeline: Home");
+}
+#else
 static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint timeline_id)
 {
 	PurpleGroup *g;
@@ -137,6 +143,7 @@ static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint 
 	purple_blist_add_chat(c, g, NULL);
 	return c;
 }
+#endif
 
 static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *searchtext)
 {
@@ -557,12 +564,14 @@ static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
 			twitter, PURPLE_CALLBACK(conversation_created_cb), account);
 	purple_signal_connect(purple_conversations_get_handle(), "deleting-conversation",
 			twitter, PURPLE_CALLBACK(deleting_conversation_cb), account);
+
 #endif
 
 	purple_connection_update_progress(gc, "Connected",
@@ -571,6 +580,11 @@ static void twitter_connected(PurpleAccount *account)
 	purple_connection_set_state(gc, PURPLE_CONNECTED);
 
 	twitter_blist_chat_timeline_new(account, 0);
+#if _HAZE_
+	//Set home timeline online
+	purple_prpl_got_user_status(account, "Timeline: Home", TWITTER_STATUS_ONLINE, NULL);
+#endif
+
 
 	/* Retrieve user's saved search queries */
 	twitter_api_get_saved_searches (account,
