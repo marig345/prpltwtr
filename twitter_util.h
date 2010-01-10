@@ -6,13 +6,19 @@
 #ifndef _TWITTER_UTIL_H_
 #define _TWITTER_UTIL_H_
 
+#include <string.h>
 #include <glib.h>
 #include <xmlnode.h>
-#include <account.h> 
-#define TWITTER_URI_ACTION_USER		"user" //TODO: move?
-#define TWITTER_URI_ACTION_SEARCH	"search" //TODO: move?
+#include <debug.h>
+
 #include "config.h"
 #include "twitter_xml.h"
+#include "twitter_prefs.h" //TODO move
+
+#define TWITTER_URI_ACTION_USER		"user" //TODO: move?
+#define TWITTER_URI_ACTION_SEARCH	"search" //TODO: move?
+
+
 
 
 long long purple_account_get_long_long(PurpleAccount *account, const gchar *key, long long default_value);

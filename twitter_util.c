@@ -3,11 +3,7 @@
  * Contact: Tan Miaoqing <rabbitrun84@gmail.com>
  */
 
-#include <string.h>
-#include <debug.h>
 #include "twitter_util.h"
-#include "twitter_prefs.h" //TODO move
-#include "config.h" //TODO move
 
 long long purple_account_get_long_long(PurpleAccount *account, const gchar *key, long long default_value)
 {
