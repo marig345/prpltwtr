@@ -525,6 +525,22 @@ static void conversation_created_cb(PurpleConversation *conv, PurpleAccount *acc
 
 static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *account)
 {
+	const char *name = purple_conversation_get_name(conv);
+
+	g_return_if_fail(name != NULL && name[0] != '\0');
+
+	if (name[0] == '#')
+	{
+		PurpleConnection *gc = purple_conversation_get_gc(conv);
+		TwitterConnectionData *twitter = gc->proto_data;
+		TwitterEndpointChat *ctx = (TwitterEndpointChat *) g_hash_table_lookup(twitter->chat_contexts, purple_conversation_get_name(conv));
+		if (ctx)
+		{
+			purple_debug_info(TWITTER_PROTOCOL_ID, "destroying haze im chat %s\n",
+				ctx->chat_name);
+			g_hash_table_remove(twitter->chat_contexts, ctx->chat_name);
+		}
+	}
 }
 #endif
 
