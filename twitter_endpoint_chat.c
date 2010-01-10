@@ -193,6 +193,10 @@ void twitter_chat_add_tweet(PurpleConvChat *chat, const char *who, const char *m
 			message,
 			id);
 #if _HAZE_
+	//This isn't in twitter_Format_tweet because we can't distinguish between a im and a chat
+	gchar *tweet2 = g_strdup_printf("%s: %s", who, tweet);
+	g_free(tweet);
+	tweet = tweet2;
 	serv_got_im(purple_conversation_get_gc(chat->conv), chat->conv->name, tweet, PURPLE_MESSAGE_RECV, time);
 #else
 	if (!purple_conv_chat_find_user(chat, who))
