@@ -1436,8 +1436,10 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 				"Sorry, this has not been implemented yet");
 	} else if (!strcmp(cmd_arg, TWITTER_URI_ACTION_SEARCH)) {
 		//join chat with default interval, open in conv window
-		//TODO fix me
-		//twitter_chat_search_join(purple_account_get_connection(account), TRUE, 0, text);
+		GHashTable *components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
+		g_hash_table_insert(components, "search", g_strdup(text));
+		twitter_endpoint_chat_start(purple_account_get_connection(account), twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH),
+				components, TRUE) ;
 	}
 	return TRUE;
 }
