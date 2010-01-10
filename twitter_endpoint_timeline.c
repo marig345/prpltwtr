@@ -63,7 +63,8 @@ static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar
 				NULL, NULL,//TODO: verify & error
 				NULL);
 #if _HAZE_
-		twitter_chat_add_tweet(PURPLE_CONV_IM(conv), account->username, message, 0, time(NULL));//TODO: FIX TIME
+		//It's already in the message box in haze. Maybe we should edit it before hand?
+		//twitter_chat_add_tweet(PURPLE_CONV_IM(conv), account->username, message, 0, time(NULL));//TODO: FIX TIME
 #else
 		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, message, 0, time(NULL));//TODO: FIX TIME
 #endif

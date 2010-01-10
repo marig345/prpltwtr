@@ -1119,6 +1119,21 @@ static int twitter_send_im(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
 {
 	/* TODO should truncate it rather than drop it????? */
+	g_return_val_if_fail(message != NULL && message[0] != '\0' && who != NULL && who[0] != '\0', 0);
+#if _HAZE_
+	if (who[0] == '#')
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of search %s\n", G_STRFUNC, who);
+		TwitterEndpointChat *endpoint = twitter_find_chat_context(purple_connection_get_account(gc), who);
+		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH);
+		return settings->send_message(endpoint, message);
+	} else if (!strcmp(who, "Timeline: Home")) {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of home timeline\n", G_STRFUNC);
+		TwitterEndpointChat *endpoint = twitter_find_chat_context(purple_connection_get_account(gc), who);
+		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_TIMELINE);
+		return settings->send_message(endpoint, message);
+	}
+#endif
 	if (strlen(who) + strlen(message) + 2 > MAX_TWEET_LENGTH)
 	{
 		purple_conv_present_error(who, purple_connection_get_account(gc), "Message is too long");
