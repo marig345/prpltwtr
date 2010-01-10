@@ -107,7 +107,7 @@ GHashTable *twitter_chat_info_defaults(PurpleConnection *gc, const char *chat_na
 #if _HAZE_
 static PurpleBuddy *twitter_blist_chat_timeline_new(PurpleAccount *account, gint timeline_id)
 {
-	return twitter_buddy_new(account, "Timeline: Home", "Timeline: Home");
+	return twitter_buddy_new(account, "Timeline: Home", NULL);
 }
 #else
 static PurpleChat *twitter_blist_chat_timeline_new(PurpleAccount *account, gint timeline_id)
@@ -421,8 +421,15 @@ static void get_saved_searches_cb (PurpleAccount *account,
 	for (search = node->child; search; search = search->next) {
 		if (search->name && !g_strcmp0 (search->name, "saved_search")) {
 			gchar *query = xmlnode_get_child_data (search, "query");
+#if _HAZE_
+			char *buddy_name = g_strdup_printf("#%s", query);
 
+			twitter_buddy_new(account, buddy_name, NULL);
+			purple_prpl_got_user_status(account, buddy_name, TWITTER_STATUS_ONLINE, NULL);
+			g_free(buddy_name);
+#else
 			twitter_blist_chat_new(account, query);
+#endif
 			g_free (query);
 		}
 	}
