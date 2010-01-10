@@ -506,10 +506,39 @@ static void twitter_init_auto_open_contexts(PurpleAccount *account)
 	return;
 }
 
+#if _HAZE_
+static void conversation_created_cb(PurpleConversation *conv, PurpleAccount *account)
+{
+	const char *name = purple_conversation_get_name(conv);
+	g_return_if_fail(name != NULL && name[0] != '\0');
+
+	if (name[0] == '#')
+	{
+		GHashTable *components = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
+		g_hash_table_insert(components, "search", g_strdup(name + 1));
+		twitter_endpoint_chat_start(purple_account_get_connection(account),
+				twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH),
+				components,
+				 TRUE) ;
+	}
+}
+
+static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *account)
+{
+}
+#endif
+
 static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
+
+#if _HAZE_
+	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
+			twitter, PURPLE_CALLBACK(conversation_created_cb), account);
+	purple_signal_connect(purple_conversations_get_handle(), "deleting-conversation",
+			twitter, PURPLE_CALLBACK(deleting_conversation_cb), account);
+#endif
 
 	purple_connection_update_progress(gc, "Connected",
 			2,   /* which connection step this is */
