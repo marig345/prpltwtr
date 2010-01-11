@@ -35,6 +35,13 @@ GList *twitter_get_protocol_options()
 			TWITTER_PREF_USE_HTTPS_DEFAULT);                        /* default value */
 	options = g_list_append(NULL, option);
 
+	/* Default sending im to buddy is to dm */
+	option = purple_account_option_bool_new(
+			("Default im to buddy is a DM"),
+			TWITTER_PREF_DEFAULT_DM,
+			TWITTER_PREF_DEFAULT_DM_DEFAULT);
+	options = g_list_append (options, option);
+
 	/* Retrieve tweets history after login */
 	option = purple_account_option_bool_new (
 			("Retrieve tweets history after login"),

@@ -31,6 +31,13 @@
 #include <gtkimhtml.h>
 #endif
 
+typedef enum
+{
+	TWITTER_IM_TYPE_AT_MSG = 0,
+	TWITTER_IM_TYPE_DM = 1,
+	TWITTER_IM_UNKNOWN = 2,
+} TwitterImType;
+
 static PurplePlugin *_twitter_protocol = NULL;
 
 static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
@@ -1069,6 +1076,42 @@ static void twitter_send_dm_error_cb(PurpleAccount *acct, const TwitterRequestEr
 			(message));
 }
 
+static TwitterImType twitter_conv_name_to_type(PurpleAccount *account, const char *name)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', TWITTER_IM_UNKNOWN);
+	if (name[0] == '@')
+		return TWITTER_IM_TYPE_AT_MSG;
+	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
+		return TWITTER_IM_TYPE_DM;
+	if (twitter_option_default_dm(account))
+		return TWITTER_IM_TYPE_DM;
+	else
+		return TWITTER_IM_TYPE_AT_MSG;
+}
+
+static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const char *name)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
+	if (name[0] == '@')
+		return name + 1;
+	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
+		return name + 2;
+	return name;
+}
+
+static char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
+	gboolean default_dm = twitter_option_default_dm(account);
+	if (default_dm && type != TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("@%s", name);
+	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("d %s", name);
+	else
+		return g_strdup(name);
+}
+
+
 static void twitter_send_dm_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
 {
 	//TODO: verify dm was sent
@@ -1097,13 +1140,13 @@ static void twitter_send_im_cb(PurpleAccount *account, xmlnode *node, gpointer u
 	 */
 }
 
-static int twitter_send_dm(PurpleConnection *gc, const char *who,
+static int twitter_send_dm_do(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
 {
 	if (strlen(message) > MAX_TWEET_LENGTH)
 	{
 		purple_conv_present_error(who, purple_connection_get_account(gc), "Message is too long");
-		return 0;
+		return -E2BIG;
 	}
 	else
 	{
@@ -1115,44 +1158,10 @@ static int twitter_send_dm(PurpleConnection *gc, const char *who,
 		return 1;
 	}
 }
-/* A few options here
- * Send message to "d buddy" will send a direct message to buddy
- * Send message to "@buddy" will send a @buddy message
- * Send message to "buddy" will send a @buddy message (TODO: will change in future, make it an option)
- * _HAZE_ Send message to "#text" will set status message with appended "text" (eg hello text)
- * _HAZE_ Send message to "Timeline: Home" will set status
- */
-static int twitter_send_im(PurpleConnection *gc, const char *who,
+
+static int twitter_send_im_do(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
 {
-	/* TODO should truncate it rather than drop it????? */
-	g_return_val_if_fail(message != NULL && message[0] != '\0' && who != NULL && who[0] != '\0', 0);
-#if _HAZE_
-	if (who[0] == '#')
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of search %s\n", G_STRFUNC, who);
-		TwitterEndpointChat *endpoint = twitter_endpoint_chat_find(purple_connection_get_account(gc), who);
-		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH);
-		return settings->send_message(endpoint, message);
-	} else if (!strcmp(who, "Timeline: Home")) {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of home timeline\n", G_STRFUNC);
-		TwitterEndpointChat *endpoint = twitter_endpoint_chat_find(purple_connection_get_account(gc), who);
-		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_TIMELINE);
-		return settings->send_message(endpoint, message);
-	}
-#endif
-	if (!strncmp(who, "d ", 2))
-	{
-		return twitter_send_dm(gc, who + 2, message, flags);
-	} else if (twitter_option_default_dm(purple_connection_get_account(gc))) {
-		return twitter_send_dm(gc, who, message, flags);
-	} 
-	
-	if (who[0] == '@') 
-	{
-		who = who + 1;
-	}
-
 	if (strlen(who) + strlen(message) + 2 > MAX_TWEET_LENGTH)
 	{
 		return -E2BIG;
@@ -1176,6 +1185,46 @@ static int twitter_send_im(PurpleConnection *gc, const char *who,
 				twitter_set_status_error_cb, NULL);
 		g_free(status);
 		return 1;
+	}
+}
+
+/* A few options here
+ * Send message to "d buddy" will send a direct message to buddy
+ * Send message to "@buddy" will send a @buddy message
+ * Send message to "buddy" will send a @buddy message (TODO: will change in future, make it an option)
+ * _HAZE_ Send message to "#text" will set status message with appended "text" (eg hello text)
+ * _HAZE_ Send message to "Timeline: Home" will set status
+ */
+static int twitter_send_im(PurpleConnection *gc, const char *conv_name,
+		const char *message, PurpleMessageFlags flags)
+{
+	TwitterImType im_type;
+	const char *buddy_name;
+	PurpleAccount *account = purple_connection_get_account(gc);
+	/* TODO should truncate it rather than drop it????? */
+	g_return_val_if_fail(message != NULL && message[0] != '\0' && conv_name != NULL && conv_name[0] != '\0', 0);
+#if _HAZE_
+	if (conv_name[0] == '#')
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of search %s\n", G_STRFUNC, conv_name);
+		TwitterEndpointChat *endpoint = twitter_endpoint_chat_find(account, conv_name);
+		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH);
+		return settings->send_message(endpoint, message);
+	} else if (!strcmp(conv_name, "Timeline: Home")) {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of home timeline\n", G_STRFUNC);
+		TwitterEndpointChat *endpoint = twitter_endpoint_chat_find(account, conv_name);
+		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_TIMELINE);
+		return settings->send_message(endpoint, message);
+	}
+#endif
+
+	im_type = twitter_conv_name_to_type(account, conv_name);
+	buddy_name = twitter_conv_name_to_buddy_name(account, conv_name);
+	if (im_type == TWITTER_IM_TYPE_DM)
+	{
+		return twitter_send_dm_do(gc, buddy_name, message, flags);
+	} else {
+		return twitter_send_im_do(gc, buddy_name, message, flags);
 	}
 }
 
