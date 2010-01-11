@@ -210,3 +210,10 @@ const gchar *twitter_option_host_search_url(PurpleAccount *account)
 			TWITTER_PREF_SEARCH_HOST_URL,
 			TWITTER_PREF_SEARCH_HOST_URL_DEFAULT);
 }
+
+gboolean twitter_option_default_dm(PurpleAccount *account)
+{
+	return purple_account_get_bool(account,
+			TWITTER_PREF_DEFAULT_DM,
+			TWITTER_PREF_DEFAULT_DM_DEFAULT);
+}

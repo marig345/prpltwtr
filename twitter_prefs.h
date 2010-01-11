@@ -68,6 +68,9 @@
 #define TWITTER_PREF_GET_FRIENDS "get_friends"
 #define TWITTER_PREF_GET_FRIENDS_DEFAULT TRUE
 
+#define TWITTER_PREF_DEFAULT_DM "default_message_is_dm"
+#define TWITTER_PREF_DEFAULT_DM_DEFAULT FALSE
+
 GList *twitter_get_protocol_options();
 
 gboolean twitter_option_add_link_to_tweet(PurpleAccount *account);
@@ -85,5 +88,6 @@ const gchar *twitter_option_host_url(PurpleAccount *account);
 const gchar *twitter_option_host_api_url(PurpleAccount *account);
 const gchar *twitter_option_host_search_url(PurpleAccount *account);
 gint twitter_option_home_timeline_max_tweets(PurpleAccount *account);
+gboolean twitter_option_default_dm(PurpleAccount *account);
 
 #endif

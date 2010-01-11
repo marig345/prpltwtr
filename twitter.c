@@ -1115,6 +1115,13 @@ static int twitter_send_dm(PurpleConnection *gc, const char *who,
 		return 1;
 	}
 }
+/* A few options here
+ * Send message to "d buddy" will send a direct message to buddy
+ * Send message to "@buddy" will send a @buddy message
+ * Send message to "buddy" will send a @buddy message (TODO: will change in future, make it an option)
+ * _HAZE_ Send message to "#text" will set status message with appended "text" (eg hello text)
+ * _HAZE_ Send message to "Timeline: Home" will set status
+ */
 static int twitter_send_im(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
 {
@@ -1137,31 +1144,38 @@ static int twitter_send_im(PurpleConnection *gc, const char *who,
 	if (!strncmp(who, "d ", 2))
 	{
 		return twitter_send_dm(gc, who + 2, message, flags);
-	} else {
-		if (strlen(who) + strlen(message) + 2 > MAX_TWEET_LENGTH)
-		{
-			return -E2BIG;
-		}
-		else
-		{
-			TwitterConnectionData *twitter = gc->proto_data;
-			long long in_reply_to_status_id = 0;
-			const gchar *reply_id;
-			char *status;
+	} else if (twitter_option_default_dm(purple_connection_get_account(gc))) {
+		return twitter_send_dm(gc, who, message, flags);
+	} 
+	
+	if (who[0] == '@') 
+	{
+		who = who + 1;
+	}
 
-			status = g_strdup_printf("@%s %s", who, message);
-			reply_id = (const gchar *)g_hash_table_lookup (
-					twitter->user_reply_id_table, who);
-			if (reply_id)
-				in_reply_to_status_id = strtoll (reply_id, NULL, 10);
+	if (strlen(who) + strlen(message) + 2 > MAX_TWEET_LENGTH)
+	{
+		return -E2BIG;
+	}
+	else
+	{
+		TwitterConnectionData *twitter = gc->proto_data;
+		long long in_reply_to_status_id = 0;
+		const gchar *reply_id;
+		char *status;
 
-			//TODO handle errors
-			twitter_api_set_status(purple_connection_get_account(gc),
-					status, in_reply_to_status_id, twitter_send_im_cb,
-					twitter_set_status_error_cb, NULL);
-			g_free(status);
-			return 1;
-		}
+		status = g_strdup_printf("@%s %s", who, message);
+		reply_id = (const gchar *)g_hash_table_lookup (
+				twitter->user_reply_id_table, who);
+		if (reply_id)
+			in_reply_to_status_id = strtoll (reply_id, NULL, 10);
+
+		//TODO handle errors
+		twitter_api_set_status(purple_connection_get_account(gc),
+				status, in_reply_to_status_id, twitter_send_im_cb,
+				twitter_set_status_error_cb, NULL);
+		g_free(status);
+		return 1;
 	}
 }
 
@@ -1327,6 +1341,15 @@ static void twitter_blist_chat_auto_open_toggle(PurpleBlistNode *node, gpointer 
 			(new_state ? g_strdup("1") : g_strdup("0")));
 }
 
+static void twitter_blist_buddy_at_msg(PurpleBlistNode *node, gpointer userdata)
+{
+	PurpleBuddy *buddy = PURPLE_BUDDY(node);
+	char *name = g_strdup_printf("@%s", buddy->name);
+	purple_conversation_new(PURPLE_CONV_TYPE_IM, purple_buddy_get_account(buddy),
+			name);
+	g_free(name);
+}
+
 static void twitter_blist_buddy_dm(PurpleBlistNode *node, gpointer userdata)
 {
 	PurpleBuddy *buddy = PURPLE_BUDDY(node);
@@ -1354,11 +1377,21 @@ static GList *twitter_blist_node_menu(PurpleBlistNode *node) {
 		return g_list_append(NULL, action);
 	} else if (PURPLE_BLIST_NODE_IS_BUDDY(node)) {
 
-		PurpleMenuAction *action = purple_menu_action_new(
-				"Direct Message",
-				PURPLE_CALLBACK(twitter_blist_buddy_dm),
-				NULL,   /* userdata passed to the callback */
-				NULL);  /* child menu items */
+		PurpleMenuAction *action;
+		if (twitter_option_default_dm(purple_buddy_get_account(PURPLE_BUDDY(node))))
+		{
+			action = purple_menu_action_new(
+					"@Message",
+					PURPLE_CALLBACK(twitter_blist_buddy_at_msg),
+					NULL,   /* userdata passed to the callback */
+					NULL);  /* child menu items */
+		} else {
+			action = purple_menu_action_new(
+					"Direct Message",
+					PURPLE_CALLBACK(twitter_blist_buddy_dm),
+					NULL,   /* userdata passed to the callback */
+					NULL);  /* child menu items */
+		}
 		return g_list_append(NULL, action);
 	} else {
 		return NULL;
