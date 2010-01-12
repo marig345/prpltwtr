@@ -31,52 +31,6 @@
 #include <gtkimhtml.h>
 #endif
 
-typedef enum
-{
-	TWITTER_IM_TYPE_AT_MSG = 0,
-	TWITTER_IM_TYPE_DM = 1,
-	TWITTER_IM_UNKNOWN = 2,
-} TwitterImType;
-
-static void twitter_im_timer_start(TwitterImContext *ctx);
-
-static gboolean twitter_im_error_cb(PurpleAccount *account,
-		const TwitterRequestErrorData *error_data,
-		gpointer user_data)
-{
-	TwitterImContext *ctx = (TwitterImContext *) user_data;
-	if (ctx->settings->error_cb(account, error_data, NULL))
-	{
-		twitter_im_timer_start(ctx);
-	}
-	return FALSE;
-}
-
-
-static void twitter_im_success_cb(PurpleAccount *account,
-		GList *nodes,
-		gpointer user_data)
-{
-	TwitterImContext *ctx = (TwitterImContext *) user_data;
-	ctx->settings->success_cb(account, nodes, NULL);
-	twitter_im_timer_start(ctx);
-}
-
-static gboolean twitter_im_timer_timeout(gpointer _ctx)
-{
-	TwitterImContext *ctx = (TwitterImContext *) _ctx;
-	ctx->settings->get_im_func(ctx->account, ctx->since_id,
-		twitter_im_success_cb, twitter_im_error_cb,
-		ctx);
-	ctx->timer = 0;
-	return FALSE;
-}
-static void twitter_im_timer_start(TwitterImContext *ctx)
-{
-	ctx->timer = purple_timeout_add_seconds(
-			60 * ctx->settings->timespan_func(ctx->account),
-			twitter_im_timer_timeout, ctx);
-}
 
 static PurplePlugin *_twitter_protocol = NULL;
 
@@ -622,9 +576,7 @@ static void twitter_connected(PurpleAccount *account)
 	TwitterConnectionData *twitter = gc->proto_data;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	twitter->replies_context = g_new0(TwitterImContext, 1);
-	twitter->replies_context->account = account;
-	twitter->replies_context->settings = &TwitterEndpointReplySettings;
+	twitter->replies_context = twitter_endpoint_im_new(account, &TwitterEndpointReplySettings);
 
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
@@ -664,7 +616,7 @@ static void twitter_connected(PurpleAccount *account)
 			NULL);
 
 	/* Install periodic timers to retrieve replies and friend list */
-	twitter_im_timer_start(twitter->replies_context);
+	twitter_endpoint_im_start(twitter->replies_context);
 
 	int get_friends_timer_timeout = twitter_option_user_status_timeout(account);
 	gboolean get_following = twitter_option_get_following(account);
@@ -1061,12 +1013,7 @@ static void twitter_close(PurpleConnection *gc)
 	/* notify other twitter accounts */
 	TwitterConnectionData *twitter = gc->proto_data;
 
-	if (twitter->replies_context)
-	{
-		if (twitter->replies_context->timer)
-			purple_timeout_remove(twitter->replies_context->timer);
-		g_free(twitter->replies_context);
-	}
+	twitter_endpoint_im_free(twitter->replies_context);
 
 	if (twitter->get_friends_timer)
 		purple_timeout_remove(twitter->get_friends_timer);

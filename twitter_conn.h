@@ -2,16 +2,11 @@
 #define _TWITTER_CONN_H_
 
 #include <glib.h>
-#include <twitter_api.h> //TODO: remove
+#include <twitter_endpoint_im.h>
 
 typedef struct
 {
-	//guint get_replies_timer;
-	//long long last_reply_id;
 	long long failed_get_replies_count;
-
-	guint get_dms_timer;
-	long long last_dm_id;
 
 	guint get_friends_timer;
 
@@ -33,7 +28,7 @@ typedef struct
 	GHashTable *user_reply_id_table;
 
 	gboolean requesting;
-	TwitterImContext *replies_context;
+	TwitterEndpointIm *replies_context;
 } TwitterConnectionData;
 
 #endif
