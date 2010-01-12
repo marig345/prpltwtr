@@ -36,30 +36,40 @@ static PurplePlugin *_twitter_protocol = NULL;
 
 static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
 
+static void twitter_get_replies_all_cb (PurpleAccount *account, GList *nodes, gpointer user_data);
+static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account,
+		const TwitterRequestErrorData *error_data,
+		gpointer user_data);
+
+static TwitterEndpointImSettings TwitterEndpointReplySettings =
+{
+	"twitter_last_reply_id",
+	twitter_option_replies_timeout,
+	twitter_api_get_replies_all,
+	twitter_get_replies_all_cb,
+	twitter_get_replies_all_timeout_error_cb,
+};
+
 static long long twitter_account_get_last_reply_id(PurpleAccount *account)
 {
-	return purple_account_get_long_long(account, "twitter_last_reply_id", 0);
+	return twitter_endpoint_im_settings_load_since_id(account, &TwitterEndpointReplySettings);
 }
 
 static void twitter_account_set_last_reply_id(PurpleAccount *account, long long reply_id)
 {
-	purple_account_set_long_long(account, "twitter_last_reply_id", reply_id);
+	return twitter_endpoint_im_settings_save_since_id(account, &TwitterEndpointReplySettings, reply_id);
 }
 
 static long long twitter_connection_get_last_reply_id(PurpleConnection *gc)
 {
-	long long reply_id = 0;
-	TwitterConnectionData *connection_data = gc->proto_data;
-	reply_id = connection_data->replies_context->since_id;
-	return (reply_id ? reply_id : twitter_account_get_last_reply_id(purple_connection_get_account(gc)));
+	TwitterConnectionData *twitter = gc->proto_data;
+	return twitter_endpoint_im_get_since_id(twitter->replies_context);
 }
 
 static void twitter_connection_set_last_reply_id(PurpleConnection *gc, long long reply_id)
 {
-	TwitterConnectionData *connection_data = gc->proto_data;
-
-	connection_data->replies_context->since_id = reply_id;
-	twitter_account_set_last_reply_id(purple_connection_get_account(gc), reply_id);
+	TwitterConnectionData *twitter = gc->proto_data;
+	return twitter_endpoint_im_set_since_id(twitter->replies_context, reply_id);
 }
 
 
@@ -365,7 +375,7 @@ static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account
 		gpointer user_data)
 {
 	twitter_get_replies_timeout_error_cb (account, error_data, user_data);
-	return FALSE;
+	return TRUE; //restart timer and try again
 }
 
 
@@ -562,13 +572,6 @@ static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *ac
 	}
 }
 #endif
-static TwitterEndpointImSettings TwitterEndpointReplySettings =
-{
-	twitter_option_replies_timeout,
-	twitter_api_get_replies_all,
-	twitter_get_replies_all_cb,
-	twitter_get_replies_all_timeout_error_cb,
-};
 
 static void twitter_connected(PurpleAccount *account)
 {
@@ -601,11 +604,6 @@ static void twitter_connected(PurpleAccount *account)
 	/* Retrieve user's saved search queries */
 	twitter_api_get_saved_searches (account,
 			get_saved_searches_cb, NULL, NULL);
-
-	/* We want to retrieve all mentions/replies since
-	 * last reply we have retrieved and stored locally */
-	twitter_connection_set_last_reply_id(gc,
-			twitter_account_get_last_reply_id(account));
 
 	/* Immediately retrieve replies */
 	twitter_api_get_replies (account,
