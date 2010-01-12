@@ -60,18 +60,6 @@ static void twitter_account_set_last_reply_id(PurpleAccount *account, long long 
 	return twitter_endpoint_im_settings_save_since_id(account, &TwitterEndpointReplySettings, reply_id);
 }
 
-static long long twitter_connection_get_last_reply_id(PurpleConnection *gc)
-{
-	TwitterConnectionData *twitter = gc->proto_data;
-	return twitter_endpoint_im_get_since_id(twitter->replies_context);
-}
-
-static void twitter_connection_set_last_reply_id(PurpleConnection *gc, long long reply_id)
-{
-	TwitterConnectionData *twitter = gc->proto_data;
-	return twitter_endpoint_im_set_since_id(twitter->replies_context, reply_id);
-}
-
 
 /******************************************************
  *  Chat
@@ -182,19 +170,21 @@ static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *se
 
 
 
-static void twitter_status_data_update_conv(PurpleAccount *account,
+static void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
 		char *conv_name,
 		TwitterStatusData *s)
 {
+	PurpleAccount *account = ctx->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
 	gchar *tweet;
 
 	if (!s || !s->text)
 		return;
 
-	if (s->id && s->id > twitter_connection_get_last_reply_id(gc))
+	if (s->id && s->id > twitter_endpoint_im_get_since_id(ctx))
 	{
-		twitter_connection_set_last_reply_id(gc, s->id);
+		purple_debug_info (TWITTER_PROTOCOL_ID, "saving %s\n", G_STRFUNC);
+		twitter_endpoint_im_set_since_id(ctx, s->id);
 	}
 	tweet = twitter_format_tweet(account, conv_name, s->text, s->id);
 
@@ -312,6 +302,7 @@ static void _process_replies (PurpleAccount *account,
 		TwitterConnectionData *twitter)
 {
 	GList *l;
+	TwitterEndpointIm *ctx = twitter->replies_context;
 
 	for (l = statuses; l; l = l->next)
 	{
@@ -327,7 +318,7 @@ static void _process_replies (PurpleAccount *account,
 			char *screen_name = g_strdup(user_data->screen_name);
 			char *conv_name = twitter_buddy_name_to_conv_name(account, screen_name, TWITTER_IM_TYPE_AT_MSG);
 			twitter_buddy_set_user_data(account, user_data, FALSE);
-			twitter_status_data_update_conv(account, conv_name, status);
+			twitter_status_data_update_conv(ctx, conv_name, status);
 			twitter_buddy_set_status_data(account, screen_name, status);
 
 			/* update user_reply_id_table table */
@@ -605,16 +596,17 @@ static void twitter_connected(PurpleAccount *account)
 	twitter_api_get_saved_searches (account,
 			get_saved_searches_cb, NULL, NULL);
 
+	/* Install periodic timers to retrieve replies and friend list */
+	twitter_endpoint_im_start(twitter->replies_context);
+
 	/* Immediately retrieve replies */
 	twitter_api_get_replies (account,
-			twitter_connection_get_last_reply_id(purple_account_get_connection(account)),
+			twitter_endpoint_im_get_since_id(twitter->replies_context),
 			TWITTER_INITIAL_REPLIES_COUNT, 1,
 			twitter_get_replies_cb,
 			twitter_get_replies_timeout_error_cb,
 			NULL);
 
-	/* Install periodic timers to retrieve replies and friend list */
-	twitter_endpoint_im_start(twitter->replies_context);
 
 	int get_friends_timer_timeout = twitter_option_user_status_timeout(account);
 	gboolean get_following = twitter_option_get_following(account);
@@ -791,45 +783,6 @@ static void twitter_action_get_user_info(PurplePluginAction *action)
 	twitter_api_get_friends(acct, twitter_get_friends_cb, NULL, NULL);
 }
 
-static void twitter_request_id_ok(PurpleConnection *gc, PurpleRequestFields *fields)
-{
-	PurpleAccount *acct = purple_connection_get_account(gc);
-	const char* str = purple_request_fields_get_string(fields, "id");
-	long long id = 0;
-	if(str)
-		id = strtoll(str, NULL, 10);
-
-	twitter_api_get_replies_all(acct,
-			id, twitter_get_replies_all_cb,
-			twitter_get_replies_all_timeout_error_cb, NULL);
-}
-static void twitter_action_get_replies(PurplePluginAction *action)
-{
-	PurpleRequestFields *request;
-	PurpleRequestFieldGroup *group;
-	PurpleRequestField *field;
-	PurpleConnection *gc = (PurpleConnection *)action->context;
-
-	group = purple_request_field_group_new(NULL);
-
-	gchar* str = g_strdup_printf("%lld", twitter_connection_get_last_reply_id(gc));
-	field = purple_request_field_string_new("id", ("Minutes"), str, FALSE);
-	g_free(str);
-	purple_request_field_group_add_field(group, field);
-
-	request = purple_request_fields_new();
-	purple_request_fields_add_group(request, group);
-
-	purple_request_fields(action->plugin,
-			("Timeline"),
-			("Set last time"),
-			NULL,
-			request,
-			("_Set"), G_CALLBACK(twitter_request_id_ok),
-			("_Cancel"), NULL,
-			purple_connection_get_account(gc), NULL, NULL,
-			gc);
-}
 static void twitter_action_set_status_ok(PurpleConnection *gc, PurpleRequestFields *fields)
 {
 	PurpleAccount *acct = purple_connection_get_account(gc);
@@ -885,9 +838,6 @@ static GList *twitter_actions(PurplePlugin *plugin, gpointer context)
 	l = g_list_append(l, NULL);
 
 	action = purple_plugin_action_new("Debug - Retrieve users", twitter_action_get_user_info);
-	l = g_list_append(l, action);
-
-	action = purple_plugin_action_new("Debug - Retrieve replies", twitter_action_get_replies);
 	l = g_list_append(l, action);
 
 	return l;
