@@ -166,7 +166,9 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 			use_https ? "https" : "http",
 			host,
 			url);
-	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s\n", full_url);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s ? %s\n",
+			full_url,
+			query_string ? query_string : "");
 
 	request_data->account = account;
 	request_data->user_data = data;

@@ -41,6 +41,10 @@ static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account
 		const TwitterRequestErrorData *error_data,
 		gpointer user_data);
 
+static void twitter_get_dms_all_cb(PurpleAccount *account, GList *nodes, gpointer user_data);
+static gboolean twitter_get_dms_all_timeout_error_cb(PurpleAccount *account,
+		const TwitterRequestErrorData *error_data,
+		gpointer user_data);
 static TwitterEndpointImSettings TwitterEndpointReplySettings =
 {
 	"twitter_last_reply_id",
@@ -48,6 +52,15 @@ static TwitterEndpointImSettings TwitterEndpointReplySettings =
 	twitter_api_get_replies_all,
 	twitter_get_replies_all_cb,
 	twitter_get_replies_all_timeout_error_cb,
+};
+
+static TwitterEndpointImSettings TwitterEndpointDmSettings =
+{
+	"twitter_last_dm_id",
+	twitter_option_dms_timeout,
+	twitter_api_get_dms_all,
+	twitter_get_dms_all_cb,
+	twitter_get_dms_all_timeout_error_cb,
 };
 
 static long long twitter_account_get_last_reply_id(PurpleAccount *account)
@@ -333,6 +346,42 @@ static void _process_replies (PurpleAccount *account,
 	twitter->failed_get_replies_count = 0;
 }
 
+static void _process_dms (PurpleAccount *account,
+		GList *statuses,
+		TwitterConnectionData *twitter)
+{
+	/*
+	GList *l;
+	TwitterEndpointIm *ctx = twitter->replies_context;
+
+	for (l = statuses; l; l = l->next)
+	{
+		TwitterBuddyData *data = l->data;
+		TwitterStatusData *status = data->status;
+		TwitterUserData *user_data = data->user;
+		g_free(data);
+
+		if (!user_data)
+		{
+			twitter_status_data_free(status);
+		} else {
+			char *screen_name = g_strdup(user_data->screen_name);
+			char *conv_name = twitter_buddy_name_to_conv_name(account, screen_name, TWITTER_IM_TYPE_AT_MSG);
+			twitter_buddy_set_user_data(account, user_data, FALSE);
+			twitter_status_data_update_conv(ctx, conv_name, status);
+			twitter_buddy_set_status_data(account, screen_name, status);
+
+			gchar *reply_id = g_strdup_printf ("%lld", status->id);
+			g_hash_table_insert (twitter->user_reply_id_table,
+					g_strdup (screen_name), reply_id);
+			g_free(screen_name);
+			g_free(conv_name);
+		}
+	}
+
+	twitter->failed_get_replies_count = 0;*/
+}
+
 static void twitter_get_replies_timeout_error_cb (PurpleAccount *account,
 		const TwitterRequestErrorData *error_data,
 		gpointer user_data)
@@ -359,6 +408,28 @@ static void twitter_get_replies_cb (PurpleAccount *account,
 	_process_replies (account, statuses, twitter);
 
 	g_list_free(statuses);
+}
+
+static gboolean twitter_get_dms_all_timeout_error_cb (PurpleAccount *account,
+		const TwitterRequestErrorData *error_data,
+		gpointer user_data)
+{
+	//twitter_get_dms_timeout_error_cb (account, error_data, user_data);
+	return TRUE; //restart timer and try again
+}
+
+
+static void twitter_get_dms_all_cb (PurpleAccount *account,
+		GList *nodes,
+		gpointer user_data)
+{
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
+
+	GList *dms = twitter_dms_nodes_parse(nodes);
+	_process_dms(account, dms, twitter);
+
+	g_list_free(dms);
 }
 
 static gboolean twitter_get_replies_all_timeout_error_cb (PurpleAccount *account,
