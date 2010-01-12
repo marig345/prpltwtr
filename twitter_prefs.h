@@ -59,6 +59,9 @@
 #define TWITTER_PREF_REPLIES_TIMEOUT "refresh_replies_minutes"
 #define	TWITTER_PREF_REPLIES_TIMEOUT_DEFAULT 30
 
+#define TWITTER_PREF_DMS_TIMEOUT "refresh_dms_minutes"
+#define	TWITTER_PREF_DMS_TIMEOUT_DEFAULT 30
+
 #define TWITTER_PREF_USER_STATUS_TIMEOUT "refresh_friendlist_minutes"
 #define	TWITTER_PREF_USER_STATUS_TIMEOUT_DEFAULT 60
 
@@ -78,6 +81,7 @@ gint twitter_option_search_timeout(PurpleAccount *account);
 gint twitter_option_timeline_timeout(PurpleAccount *account);
 const gchar *twitter_option_search_group(PurpleAccount *account);
 const gchar *twitter_option_buddy_group(PurpleAccount *account);
+gint twitter_option_dms_timeout(PurpleAccount *account);
 gint twitter_option_replies_timeout(PurpleAccount *account);
 gboolean twitter_option_get_following(PurpleAccount *account);
 gint twitter_option_user_status_timeout(PurpleAccount *account);

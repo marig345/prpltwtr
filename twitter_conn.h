@@ -6,10 +6,15 @@
 typedef struct
 {
 	guint get_replies_timer;
-	guint get_friends_timer;
 	long long last_reply_id;
-	long long last_home_timeline_id;
 	long long failed_get_replies_count;
+
+	guint get_dms_timer;
+	long long last_dm_id;
+
+	guint get_friends_timer;
+
+	long long last_home_timeline_id;
 
 	/* a table of TwitterEndpointChat
 	 * where the key will be the chat name

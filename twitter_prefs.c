@@ -100,6 +100,13 @@ GList *twitter_get_protocol_options()
 			TWITTER_PREF_REPLIES_TIMEOUT_DEFAULT);                        /* default value */
 	options = g_list_append(options, option);
 
+	/* Dms refresh interval */
+	option = purple_account_option_int_new(
+			("Refresh direct messages every (min)"),      /* text shown to user */
+			TWITTER_PREF_DMS_TIMEOUT,                         /* pref name */
+			TWITTER_PREF_DMS_TIMEOUT_DEFAULT);                        /* default value */
+	options = g_list_append(options, option);
+
 	/* Friendlist refresh interval */
 	option = purple_account_option_int_new(
 			("Refresh friendlist every (min)"),      /* text shown to user */
@@ -153,6 +160,13 @@ gint twitter_option_replies_timeout(PurpleAccount *account)
 	return purple_account_get_int(account,
 			TWITTER_PREF_REPLIES_TIMEOUT,
 			TWITTER_PREF_REPLIES_TIMEOUT_DEFAULT);
+}
+
+gint twitter_option_dms_timeout(PurpleAccount *account)
+{
+	return purple_account_get_int(account,
+			TWITTER_PREF_DMS_TIMEOUT,
+			TWITTER_PREF_DMS_TIMEOUT_DEFAULT);
 }
 
 gint twitter_option_user_status_timeout(PurpleAccount *account)
