@@ -30,17 +30,27 @@ typedef void (*TwitterApiImAllFunc) (PurpleAccount *account,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
 		gpointer data);
 
+typedef struct
+{
+	int (*timespan_func)(PurpleAccount *account);
+	TwitterApiImAllFunc get_im_func;
+	TwitterSendRequestMultiPageAllSuccessFunc success_cb;
+	TwitterSendRequestMultiPageAllErrorFunc error_cb;
+} TwitterEndpointImSettings;
+
 //TODO: move me
 typedef struct
 {
 	PurpleAccount *account;
 	guint timer;
 	long long since_id;
-	int (*timespan_func)(PurpleAccount *account);
+	TwitterEndpointImSettings *settings;
+	/*int (*timespan_func)(PurpleAccount *account);
 	TwitterApiImAllFunc get_im_func;
 	TwitterSendRequestMultiPageAllSuccessFunc success_cb;
-	TwitterSendRequestMultiPageAllErrorFunc error_cb;
+	TwitterSendRequestMultiPageAllErrorFunc error_cb;*/
 } TwitterImContext;
+
 
 
 

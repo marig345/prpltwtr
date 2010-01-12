@@ -45,7 +45,7 @@ static gboolean twitter_im_error_cb(PurpleAccount *account,
 		gpointer user_data)
 {
 	TwitterImContext *ctx = (TwitterImContext *) user_data;
-	if (ctx->error_cb(account, error_data, NULL))
+	if (ctx->settings->error_cb(account, error_data, NULL))
 	{
 		twitter_im_timer_start(ctx);
 	}
@@ -58,14 +58,14 @@ static void twitter_im_success_cb(PurpleAccount *account,
 		gpointer user_data)
 {
 	TwitterImContext *ctx = (TwitterImContext *) user_data;
-	ctx->success_cb(account, nodes, NULL);
+	ctx->settings->success_cb(account, nodes, NULL);
 	twitter_im_timer_start(ctx);
 }
 
 static gboolean twitter_im_timer_timeout(gpointer _ctx)
 {
 	TwitterImContext *ctx = (TwitterImContext *) _ctx;
-	ctx->get_im_func(ctx->account, ctx->since_id,
+	ctx->settings->get_im_func(ctx->account, ctx->since_id,
 		twitter_im_success_cb, twitter_im_error_cb,
 		ctx);
 	ctx->timer = 0;
@@ -74,7 +74,7 @@ static gboolean twitter_im_timer_timeout(gpointer _ctx)
 static void twitter_im_timer_start(TwitterImContext *ctx)
 {
 	ctx->timer = purple_timeout_add_seconds(
-			60 * ctx->timespan_func(ctx->account),
+			60 * ctx->settings->timespan_func(ctx->account),
 			twitter_im_timer_timeout, ctx);
 }
 
@@ -608,6 +608,13 @@ static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *ac
 	}
 }
 #endif
+static TwitterEndpointImSettings TwitterEndpointReplySettings =
+{
+	twitter_option_replies_timeout,
+	twitter_api_get_replies_all,
+	twitter_get_replies_all_cb,
+	twitter_get_replies_all_timeout_error_cb,
+};
 
 static void twitter_connected(PurpleAccount *account)
 {
@@ -617,10 +624,7 @@ static void twitter_connected(PurpleAccount *account)
 
 	twitter->replies_context = g_new0(TwitterImContext, 1);
 	twitter->replies_context->account = account;
-	twitter->replies_context->timespan_func = twitter_option_replies_timeout;
-	twitter->replies_context->get_im_func = twitter_api_get_replies_all;
-	twitter->replies_context->success_cb = twitter_get_replies_all_cb;
-	twitter->replies_context->error_cb = twitter_get_replies_all_timeout_error_cb;
+	twitter->replies_context->settings = &TwitterEndpointReplySettings;
 
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
@@ -1066,8 +1070,6 @@ static void twitter_close(PurpleConnection *gc)
 
 	if (twitter->get_friends_timer)
 		purple_timeout_remove(twitter->get_friends_timer);
-
-	//TODO XXX clear out all chat_contexts
 
 	if (twitter->chat_contexts)
 		g_hash_table_destroy(twitter->chat_contexts);

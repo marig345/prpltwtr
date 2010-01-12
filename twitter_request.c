@@ -102,16 +102,16 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 	xmlnode *response_node = NULL;
 	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
 
-	purple_debug_info(TWITTER_PROTOCOL_ID, "Response: %s\n", url_text);
-
 	if (server_error_message)
 	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: %s\n", server_error_message);
 		error_type = TWITTER_REQUEST_ERROR_SERVER;
 		error_message = server_error_message;
 	} else {
 		response_node = xmlnode_from_str(url_text, len);
 		if (!response_node)
 		{
+			purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: invalid xml\n");
 			error_type = TWITTER_REQUEST_ERROR_INVALID_XML;
 			error_message = url_text;
 		} else {
@@ -121,6 +121,7 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 				error_type = TWITTER_REQUEST_ERROR_TWITTER_GENERAL;
 				error_node_text = xmlnode_get_data(error_node);
 				error_message = error_node_text;
+				purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: Twitter error %s\n", error_message);
 			}
 		}
 	}
@@ -136,6 +137,7 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 
 		g_free(error_data);
 	} else {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
 		if (request_data->success_func)
 			request_data->success_func(request_data->account, response_node, request_data->user_data);
 	}
@@ -164,6 +166,7 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 			use_https ? "https" : "http",
 			host,
 			url);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s\n", full_url);
 
 	request_data->account = account;
 	request_data->user_data = data;
