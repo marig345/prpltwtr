@@ -179,7 +179,7 @@ static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *se
 
 
 static void twitter_status_data_update_conv(PurpleAccount *account,
-		char *src_user,
+		char *conv_name,
 		TwitterStatusData *s)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
@@ -192,13 +192,13 @@ static void twitter_status_data_update_conv(PurpleAccount *account,
 	{
 		twitter_connection_set_last_reply_id(gc, s->id);
 	}
-	tweet = twitter_format_tweet(account, src_user, s->text, s->id);
+	tweet = twitter_format_tweet(account, conv_name, s->text, s->id);
 
 	//Account received an im
 	/* TODO get in_reply_to_status? s->in_reply_to_screen_name
 	 * s->in_reply_to_status_id */
 
-	serv_got_im(gc, src_user,
+	serv_got_im(gc, conv_name,
 			tweet,
 			PURPLE_MESSAGE_RECV,
 			s->created_at);
@@ -290,6 +290,18 @@ static gboolean twitter_get_friends_timeout(gpointer data)
  *  Twitter relies/mentions
  ******************************************************/
 
+static char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
+	gboolean default_dm = twitter_option_default_dm(account);
+	if (default_dm && type != TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("@%s", name);
+	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("d %s", name);
+	else
+		return g_strdup(name);
+}
+
 
 static void _process_replies (PurpleAccount *account,
 		GList *statuses,
@@ -309,8 +321,9 @@ static void _process_replies (PurpleAccount *account,
 			twitter_status_data_free(status);
 		} else {
 			char *screen_name = g_strdup(user_data->screen_name);
+			char *conv_name = twitter_buddy_name_to_conv_name(account, screen_name, TWITTER_IM_TYPE_AT_MSG);
 			twitter_buddy_set_user_data(account, user_data, FALSE);
-			twitter_status_data_update_conv(account, screen_name, status);
+			twitter_status_data_update_conv(account, conv_name, status);
 			twitter_buddy_set_status_data(account, screen_name, status);
 
 			/* update user_reply_id_table table */
@@ -318,6 +331,7 @@ static void _process_replies (PurpleAccount *account,
 			g_hash_table_insert (twitter->user_reply_id_table,
 					g_strdup (screen_name), reply_id);
 			g_free(screen_name);
+			g_free(conv_name);
 		}
 	}
 
@@ -1097,18 +1111,6 @@ static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const
 	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
 		return name + 2;
 	return name;
-}
-
-static char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
-{
-	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
-	gboolean default_dm = twitter_option_default_dm(account);
-	if (default_dm && type != TWITTER_IM_TYPE_DM)
-		return g_strdup_printf("@%s", name);
-	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
-		return g_strdup_printf("d %s", name);
-	else
-		return g_strdup(name);
 }
 
 
