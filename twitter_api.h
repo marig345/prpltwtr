@@ -24,6 +24,26 @@
 #include "twitter_prefs.h"
 #include "twitter_search.h"
 
+typedef void (*TwitterApiImAllFunc) (PurpleAccount *account,
+		long long since_id,
+		TwitterSendRequestMultiPageAllSuccessFunc success_func,
+		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gpointer data);
+
+//TODO: move me
+typedef struct
+{
+	PurpleAccount *account;
+	guint timer;
+	long long since_id;
+	int (*timespan_func)(PurpleAccount *account);
+	TwitterApiImAllFunc get_im_func;
+	TwitterSendRequestMultiPageAllSuccessFunc success_cb;
+	TwitterSendRequestMultiPageAllErrorFunc error_cb;
+} TwitterImContext;
+
+
+
 void twitter_api_get_friends(PurpleAccount *account,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
@@ -43,6 +63,7 @@ void twitter_api_get_home_timeline(PurpleAccount *account,
 		TwitterSendRequestSuccessFunc success_func,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data);
+
 
 void twitter_api_get_dms_all(PurpleAccount *account,
 		long long since_id,

@@ -18,9 +18,6 @@
 #define TWITTER_URI_ACTION_USER		"user" //TODO: move?
 #define TWITTER_URI_ACTION_SEARCH	"search" //TODO: move?
 
-
-
-
 long long purple_account_get_long_long(PurpleAccount *account, const gchar *key, long long default_value);
 void purple_account_set_long_long(PurpleAccount *account, const gchar *key, long long value);
 

@@ -38,6 +38,46 @@ typedef enum
 	TWITTER_IM_UNKNOWN = 2,
 } TwitterImType;
 
+static void twitter_im_timer_start(TwitterImContext *ctx);
+
+static gboolean twitter_im_error_cb(PurpleAccount *account,
+		const TwitterRequestErrorData *error_data,
+		gpointer user_data)
+{
+	TwitterImContext *ctx = (TwitterImContext *) user_data;
+	if (ctx->error_cb(account, error_data, NULL))
+	{
+		twitter_im_timer_start(ctx);
+	}
+	return FALSE;
+}
+
+
+static void twitter_im_success_cb(PurpleAccount *account,
+		GList *nodes,
+		gpointer user_data)
+{
+	TwitterImContext *ctx = (TwitterImContext *) user_data;
+	ctx->success_cb(account, nodes, NULL);
+	twitter_im_timer_start(ctx);
+}
+
+static gboolean twitter_im_timer_timeout(gpointer _ctx)
+{
+	TwitterImContext *ctx = (TwitterImContext *) _ctx;
+	ctx->get_im_func(ctx->account, ctx->since_id,
+		twitter_im_success_cb, twitter_im_error_cb,
+		ctx);
+	ctx->timer = 0;
+	return FALSE;
+}
+static void twitter_im_timer_start(TwitterImContext *ctx)
+{
+	ctx->timer = purple_timeout_add_seconds(
+			60 * ctx->timespan_func(ctx->account),
+			twitter_im_timer_timeout, ctx);
+}
+
 static PurplePlugin *_twitter_protocol = NULL;
 
 static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
@@ -56,7 +96,7 @@ static long long twitter_connection_get_last_reply_id(PurpleConnection *gc)
 {
 	long long reply_id = 0;
 	TwitterConnectionData *connection_data = gc->proto_data;
-	reply_id = connection_data->last_reply_id;
+	reply_id = connection_data->replies_context->since_id;
 	return (reply_id ? reply_id : twitter_account_get_last_reply_id(purple_connection_get_account(gc)));
 }
 
@@ -64,7 +104,7 @@ static void twitter_connection_set_last_reply_id(PurpleConnection *gc, long long
 {
 	TwitterConnectionData *connection_data = gc->proto_data;
 
-	connection_data->last_reply_id = reply_id;
+	connection_data->replies_context->since_id = reply_id;
 	twitter_account_set_last_reply_id(purple_connection_get_account(gc), reply_id);
 }
 
@@ -336,7 +376,6 @@ static void _process_replies (PurpleAccount *account,
 	}
 
 	twitter->failed_get_replies_count = 0;
-	twitter->requesting = FALSE;
 }
 
 static void twitter_get_replies_timeout_error_cb (PurpleAccount *account,
@@ -352,7 +391,6 @@ static void twitter_get_replies_timeout_error_cb (PurpleAccount *account,
 		purple_connection_error_reason(gc, PURPLE_CONNECTION_ERROR_NETWORK_ERROR, "Could not retrieve replies, giving up trying");
 	}
 
-	twitter->requesting = FALSE;
 }
 
 static void twitter_get_replies_cb (PurpleAccount *account,
@@ -389,23 +427,6 @@ static void twitter_get_replies_all_cb (PurpleAccount *account,
 
 	g_list_free(statuses);
 }
-
-static gboolean twitter_get_replies_timeout (gpointer data)
-{
-	PurpleAccount *account = data;
-	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterConnectionData *twitter = gc->proto_data;
-
-	if (!twitter->requesting) {
-		twitter->requesting = TRUE;
-		twitter_api_get_replies_all(account,
-				twitter_connection_get_last_reply_id(purple_account_get_connection(account)),
-				twitter_get_replies_all_cb, twitter_get_replies_all_timeout_error_cb,
-				NULL);
-	}
-	return TRUE;
-}
-
 
 /******************************************************
  *  Twitter search
@@ -594,6 +615,13 @@ static void twitter_connected(PurpleAccount *account)
 	TwitterConnectionData *twitter = gc->proto_data;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
+	twitter->replies_context = g_new0(TwitterImContext, 1);
+	twitter->replies_context->account = account;
+	twitter->replies_context->timespan_func = twitter_option_replies_timeout;
+	twitter->replies_context->get_im_func = twitter_api_get_replies_all;
+	twitter->replies_context->success_cb = twitter_get_replies_all_cb;
+	twitter->replies_context->error_cb = twitter_get_replies_all_timeout_error_cb;
+
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
 			twitter, PURPLE_CALLBACK(conversation_created_cb), account);
@@ -624,7 +652,6 @@ static void twitter_connected(PurpleAccount *account)
 			twitter_account_get_last_reply_id(account));
 
 	/* Immediately retrieve replies */
-	twitter->requesting = TRUE;
 	twitter_api_get_replies (account,
 			twitter_connection_get_last_reply_id(purple_account_get_connection(account)),
 			TWITTER_INITIAL_REPLIES_COUNT, 1,
@@ -633,9 +660,7 @@ static void twitter_connected(PurpleAccount *account)
 			NULL);
 
 	/* Install periodic timers to retrieve replies and friend list */
-	twitter->get_replies_timer = purple_timeout_add_seconds(
-			60 * twitter_option_replies_timeout(account),
-			twitter_get_replies_timeout, account);
+	twitter_im_timer_start(twitter->replies_context);
 
 	int get_friends_timer_timeout = twitter_option_user_status_timeout(account);
 	gboolean get_following = twitter_option_get_following(account);
@@ -815,18 +840,14 @@ static void twitter_action_get_user_info(PurplePluginAction *action)
 static void twitter_request_id_ok(PurpleConnection *gc, PurpleRequestFields *fields)
 {
 	PurpleAccount *acct = purple_connection_get_account(gc);
-	TwitterConnectionData *twitter = gc->proto_data;
 	const char* str = purple_request_fields_get_string(fields, "id");
 	long long id = 0;
 	if(str)
 		id = strtoll(str, NULL, 10);
 
-	if (!twitter->requesting) {
-		twitter->requesting = TRUE;
-		twitter_api_get_replies_all(acct,
-				id, twitter_get_replies_all_cb,
-				twitter_get_replies_all_timeout_error_cb, NULL);
-	}
+	twitter_api_get_replies_all(acct,
+			id, twitter_get_replies_all_cb,
+			twitter_get_replies_all_timeout_error_cb, NULL);
 }
 static void twitter_action_get_replies(PurplePluginAction *action)
 {
@@ -1036,8 +1057,12 @@ static void twitter_close(PurpleConnection *gc)
 	/* notify other twitter accounts */
 	TwitterConnectionData *twitter = gc->proto_data;
 
-	if (twitter->get_replies_timer)
-		purple_timeout_remove(twitter->get_replies_timer);
+	if (twitter->replies_context)
+	{
+		if (twitter->replies_context->timer)
+			purple_timeout_remove(twitter->replies_context->timer);
+		g_free(twitter->replies_context);
+	}
 
 	if (twitter->get_friends_timer)
 		purple_timeout_remove(twitter->get_friends_timer);
