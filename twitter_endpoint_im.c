@@ -43,7 +43,7 @@ static void twitter_endpoint_im_success_cb(PurpleAccount *account,
 static gboolean twitter_im_timer_timeout(gpointer _ctx)
 {
 	TwitterEndpointIm *ctx = (TwitterEndpointIm *) _ctx;
-	ctx->settings->get_im_func(ctx->account, ctx->since_id,
+	ctx->settings->get_im_func(ctx->account, twitter_endpoint_im_get_since_id(ctx),
 		twitter_endpoint_im_success_cb, twitter_endpoint_im_error_cb,
 		ctx);
 	ctx->timer = 0;
