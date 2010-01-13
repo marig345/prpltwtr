@@ -20,6 +20,7 @@ typedef void (*TwitterApiImAllFunc) (PurpleAccount *account,
 
 typedef struct
 {
+	TwitterImType type;
 	const gchar *since_id_setting_id;
 	int (*timespan_func)(PurpleAccount *account);
 	TwitterApiImAllFunc get_im_func;

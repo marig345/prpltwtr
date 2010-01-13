@@ -29,7 +29,6 @@ typedef struct
 
 	gboolean requesting;
 	TwitterEndpointIm *endpoint_ims[TWITTER_IM_TYPE_UNKNOWN];
-	TwitterEndpointIm *replies_context;
 } TwitterConnectionData;
 
 #endif

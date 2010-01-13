@@ -48,6 +48,7 @@ static gboolean twitter_get_dms_all_timeout_error_cb(PurpleAccount *account,
 
 static TwitterEndpointImSettings TwitterEndpointReplySettings =
 {
+	TWITTER_IM_TYPE_AT_MSG,
 	"twitter_last_reply_id",
 	twitter_option_replies_timeout,
 	twitter_api_get_replies_all,
@@ -57,6 +58,7 @@ static TwitterEndpointImSettings TwitterEndpointReplySettings =
 
 static TwitterEndpointImSettings TwitterEndpointDmSettings =
 {
+	TWITTER_IM_TYPE_DM,
 	"twitter_last_dm_id",
 	twitter_option_dms_timeout,
 	twitter_api_get_dms_all,
@@ -73,6 +75,18 @@ static void twitter_account_set_last_reply_id(PurpleAccount *account, long long 
 {
 	return twitter_endpoint_im_settings_save_since_id(account, &TwitterEndpointReplySettings, reply_id);
 }
+
+static TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionData *twitter, TwitterImType type)
+{
+	if (type >= 0 && type < TWITTER_IM_TYPE_UNKNOWN)
+		return twitter->endpoint_ims[type];
+	return NULL;
+}
+static void twitter_connection_set_endpoint_im(TwitterConnectionData *twitter, TwitterImType type, TwitterEndpointIm *endpoint)
+{
+	twitter->endpoint_ims[type] = endpoint;
+}
+
 
 /******************************************************
  *  Chat
@@ -181,14 +195,25 @@ static PurpleChat *twitter_blist_chat_new(PurpleAccount *account, const char *se
 	return c;
 }
 
-
+static char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
+	gboolean default_dm = twitter_option_default_dm(account);
+	if (default_dm && type != TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("@%s", name);
+	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("d %s", name);
+	else
+		return g_strdup(name);
+}
 
 static void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
-		char *conv_name,
+		char *buddy_name,
 		TwitterStatusData *s)
 {
 	PurpleAccount *account = ctx->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
+	gchar *conv_name;
 	gchar *tweet;
 
 	if (!s || !s->text)
@@ -199,7 +224,13 @@ static void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
 		purple_debug_info (TWITTER_PROTOCOL_ID, "saving %s\n", G_STRFUNC);
 		twitter_endpoint_im_set_since_id(ctx, s->id);
 	}
-	tweet = twitter_format_tweet(account, conv_name, s->text, s->id);
+	tweet = twitter_format_tweet(account,
+			buddy_name,
+			s->text,
+			s->id,
+			ctx->settings->type == TWITTER_IM_TYPE_AT_MSG);
+
+	conv_name = twitter_buddy_name_to_conv_name(account, buddy_name, ctx->settings->type);
 
 	//Account received an im
 	/* TODO get in_reply_to_status? s->in_reply_to_screen_name
@@ -297,25 +328,13 @@ static gboolean twitter_get_friends_timeout(gpointer data)
  *  Twitter relies/mentions
  ******************************************************/
 
-static char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
-{
-	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
-	gboolean default_dm = twitter_option_default_dm(account);
-	if (default_dm && type != TWITTER_IM_TYPE_DM)
-		return g_strdup_printf("@%s", name);
-	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
-		return g_strdup_printf("d %s", name);
-	else
-		return g_strdup(name);
-}
-
 
 static void _process_replies (PurpleAccount *account,
 		GList *statuses,
 		TwitterConnectionData *twitter)
 {
 	GList *l;
-	TwitterEndpointIm *ctx = twitter->replies_context;
+	TwitterEndpointIm *ctx = twitter_connection_get_endpoint_im(twitter, TWITTER_IM_TYPE_AT_MSG);
 
 	for (l = statuses; l; l = l->next)
 	{
@@ -329,9 +348,8 @@ static void _process_replies (PurpleAccount *account,
 			twitter_status_data_free(status);
 		} else {
 			char *screen_name = g_strdup(user_data->screen_name);
-			char *conv_name = twitter_buddy_name_to_conv_name(account, screen_name, TWITTER_IM_TYPE_AT_MSG);
 			twitter_buddy_set_user_data(account, user_data, FALSE);
-			twitter_status_data_update_conv(ctx, conv_name, status);
+			twitter_status_data_update_conv(ctx, screen_name, status);
 			twitter_buddy_set_status_data(account, screen_name, status);
 
 			/* update user_reply_id_table table */
@@ -339,20 +357,18 @@ static void _process_replies (PurpleAccount *account,
 			g_hash_table_insert (twitter->user_reply_id_table,
 					g_strdup (screen_name), reply_id);
 			g_free(screen_name);
-			g_free(conv_name);
 		}
 	}
 
 	twitter->failed_get_replies_count = 0;
 }
 
-static void _process_dms (PurpleAccount *account,
+static void _process_dms(PurpleAccount *account,
 		GList *statuses,
 		TwitterConnectionData *twitter)
 {
-	/*
 	GList *l;
-	TwitterEndpointIm *ctx = twitter->replies_context;
+	TwitterEndpointIm *ctx = twitter_connection_get_endpoint_im(twitter, TWITTER_IM_TYPE_DM);
 
 	for (l = statuses; l; l = l->next)
 	{
@@ -366,20 +382,14 @@ static void _process_dms (PurpleAccount *account,
 			twitter_status_data_free(status);
 		} else {
 			char *screen_name = g_strdup(user_data->screen_name);
-			char *conv_name = twitter_buddy_name_to_conv_name(account, screen_name, TWITTER_IM_TYPE_AT_MSG);
-			twitter_buddy_set_user_data(account, user_data, FALSE);
-			twitter_status_data_update_conv(ctx, conv_name, status);
-			twitter_buddy_set_status_data(account, screen_name, status);
 
-			gchar *reply_id = g_strdup_printf ("%lld", status->id);
-			g_hash_table_insert (twitter->user_reply_id_table,
-					g_strdup (screen_name), reply_id);
+			twitter_buddy_set_user_data(account, user_data, FALSE);
+			twitter_status_data_update_conv(ctx, screen_name, status);
+			twitter_status_data_free(status);
+
 			g_free(screen_name);
-			g_free(conv_name);
 		}
 	}
-
-	twitter->failed_get_replies_count = 0;*/
 }
 
 static void twitter_get_replies_timeout_error_cb (PurpleAccount *account,
@@ -635,21 +645,18 @@ static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *ac
 }
 #endif
 
-static TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionData *twitter, TwitterImType type)
-{
-	if (type >= 0 && type < TWITTER_IM_TYPE_UNKNOWN)
-		return twitter->endpoint_ims[type];
-	return NULL;
-}
-
 static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
+	TwitterEndpointIm *replies_context;
+	int i;
+
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	//twitter->endpoint_ims = (TwitterEndpointIm**) g_new0(TwitterEndpointIm*, 2);
-	twitter->replies_context = twitter_endpoint_im_new(account, &TwitterEndpointReplySettings);
+	replies_context = twitter_endpoint_im_new(account, &TwitterEndpointReplySettings);
+	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_AT_MSG, replies_context);
+	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_DM, twitter_endpoint_im_new(account, &TwitterEndpointDmSettings));
 
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
@@ -675,12 +682,15 @@ static void twitter_connected(PurpleAccount *account)
 	twitter_api_get_saved_searches (account,
 			get_saved_searches_cb, NULL, NULL);
 
-	/* Install periodic timers to retrieve replies and friend list */
-	twitter_endpoint_im_start(twitter->replies_context);
+	/* Install periodic timers to retrieve replies and dms */
+	for (i = 0; i < TWITTER_IM_TYPE_UNKNOWN; i++)
+	{
+		twitter_endpoint_im_start(twitter->endpoint_ims[i]);
+	}
 
 	/* Immediately retrieve replies */
 	twitter_api_get_replies (account,
-			twitter_endpoint_im_get_since_id(twitter->replies_context),
+			twitter_endpoint_im_get_since_id(replies_context),
 			TWITTER_INITIAL_REPLIES_COUNT, 1,
 			twitter_get_replies_cb,
 			twitter_get_replies_timeout_error_cb,
@@ -1039,8 +1049,10 @@ static void twitter_close(PurpleConnection *gc)
 {
 	/* notify other twitter accounts */
 	TwitterConnectionData *twitter = gc->proto_data;
+	int i = 0;
 
-	twitter_endpoint_im_free(twitter->replies_context);
+	for (i = 0; i < TWITTER_IM_TYPE_UNKNOWN; i++)
+		twitter_endpoint_im_free(twitter->endpoint_ims[i]);
 
 	if (twitter->get_friends_timer)
 		purple_timeout_remove(twitter->get_friends_timer);
