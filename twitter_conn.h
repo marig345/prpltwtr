@@ -31,4 +31,8 @@ typedef struct
 	TwitterEndpointIm *endpoint_ims[TWITTER_IM_TYPE_UNKNOWN];
 } TwitterConnectionData;
 
+void twitter_connection_foreach_endpoint_im(TwitterConnectionData *twitter,
+		void (*cb)(TwitterConnectionData *twitter, TwitterEndpointIm *im, gpointer data),
+		gpointer data);
+
 #endif

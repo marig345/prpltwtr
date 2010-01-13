@@ -82,6 +82,7 @@ static TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionDa
 		return twitter->endpoint_ims[type];
 	return NULL;
 }
+
 static void twitter_connection_set_endpoint_im(TwitterConnectionData *twitter, TwitterImType type, TwitterEndpointIm *endpoint)
 {
 	twitter->endpoint_ims[type] = endpoint;
@@ -645,12 +646,16 @@ static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *ac
 }
 #endif
 
+static void twitter_endpoint_im_start_foreach(TwitterConnectionData *twitter, TwitterEndpointIm *im, gpointer data)
+{
+	twitter_endpoint_im_start(im);
+}
+
 static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterEndpointIm *replies_context;
-	int i;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -683,10 +688,7 @@ static void twitter_connected(PurpleAccount *account)
 			get_saved_searches_cb, NULL, NULL);
 
 	/* Install periodic timers to retrieve replies and dms */
-	for (i = 0; i < TWITTER_IM_TYPE_UNKNOWN; i++)
-	{
-		twitter_endpoint_im_start(twitter->endpoint_ims[i]);
-	}
+	twitter_connection_foreach_endpoint_im(twitter, twitter_endpoint_im_start_foreach, NULL);
 
 	/* Immediately retrieve replies */
 	twitter_api_get_replies (account,
@@ -1045,14 +1047,17 @@ static void twitter_login(PurpleAccount *acct)
 	twitter_verify_connection(acct);
 }
 
+static void twitter_endpoint_im_free_foreach(TwitterConnectionData *conn, TwitterEndpointIm *im, gpointer data)
+{
+	twitter_endpoint_im_free(im);
+}
+
 static void twitter_close(PurpleConnection *gc)
 {
 	/* notify other twitter accounts */
 	TwitterConnectionData *twitter = gc->proto_data;
-	int i = 0;
 
-	for (i = 0; i < TWITTER_IM_TYPE_UNKNOWN; i++)
-		twitter_endpoint_im_free(twitter->endpoint_ims[i]);
+	twitter_connection_foreach_endpoint_im(twitter, twitter_endpoint_im_free_foreach, NULL);
 
 	if (twitter->get_friends_timer)
 		purple_timeout_remove(twitter->get_friends_timer);
