@@ -34,5 +34,7 @@ typedef struct
 void twitter_connection_foreach_endpoint_im(TwitterConnectionData *twitter,
 		void (*cb)(TwitterConnectionData *twitter, TwitterEndpointIm *im, gpointer data),
 		gpointer data);
+TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionData *twitter, TwitterImType type);
+void twitter_connection_set_endpoint_im(TwitterConnectionData *twitter, TwitterImType type, TwitterEndpointIm *endpoint);
 
 #endif

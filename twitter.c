@@ -76,18 +76,6 @@ static void twitter_account_set_last_reply_id(PurpleAccount *account, long long 
 	return twitter_endpoint_im_settings_save_since_id(account, &TwitterEndpointReplySettings, reply_id);
 }
 
-static TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionData *twitter, TwitterImType type)
-{
-	if (type >= 0 && type < TWITTER_IM_TYPE_UNKNOWN)
-		return twitter->endpoint_ims[type];
-	return NULL;
-}
-
-static void twitter_connection_set_endpoint_im(TwitterConnectionData *twitter, TwitterImType type, TwitterEndpointIm *endpoint)
-{
-	twitter->endpoint_ims[type] = endpoint;
-}
-
 
 /******************************************************
  *  Chat

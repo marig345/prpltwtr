@@ -9,3 +9,16 @@ void twitter_connection_foreach_endpoint_im(TwitterConnectionData *twitter,
 		if (twitter->endpoint_ims[i])
 			cb(twitter, twitter->endpoint_ims[i], data);
 }
+
+TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionData *twitter, TwitterImType type)
+{
+	if (type >= 0 && type < TWITTER_IM_TYPE_UNKNOWN)
+		return twitter->endpoint_ims[type];
+	return NULL;
+}
+
+void twitter_connection_set_endpoint_im(TwitterConnectionData *twitter, TwitterImType type, TwitterEndpointIm *endpoint)
+{
+	twitter->endpoint_ims[type] = endpoint;
+}
+
