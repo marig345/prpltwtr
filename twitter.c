@@ -45,6 +45,7 @@ static void twitter_get_dms_all_cb(PurpleAccount *account, GList *nodes, gpointe
 static gboolean twitter_get_dms_all_timeout_error_cb(PurpleAccount *account,
 		const TwitterRequestErrorData *error_data,
 		gpointer user_data);
+
 static TwitterEndpointImSettings TwitterEndpointReplySettings =
 {
 	"twitter_last_reply_id",
@@ -72,7 +73,6 @@ static void twitter_account_set_last_reply_id(PurpleAccount *account, long long 
 {
 	return twitter_endpoint_im_settings_save_since_id(account, &TwitterEndpointReplySettings, reply_id);
 }
-
 
 /******************************************************
  *  Chat
@@ -635,12 +635,20 @@ static void deleting_conversation_cb(PurpleConversation *conv, PurpleAccount *ac
 }
 #endif
 
+static TwitterEndpointIm *twitter_connection_get_endpoint_im(TwitterConnectionData *twitter, TwitterImType type)
+{
+	if (type >= 0 && type < TWITTER_IM_TYPE_UNKNOWN)
+		return twitter->endpoint_ims[type];
+	return NULL;
+}
+
 static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
+	//twitter->endpoint_ims = (TwitterEndpointIm**) g_new0(TwitterEndpointIm*, 2);
 	twitter->replies_context = twitter_endpoint_im_new(account, &TwitterEndpointReplySettings);
 
 #if _HAZE_
@@ -1085,7 +1093,7 @@ static void twitter_send_dm_error_cb(PurpleAccount *acct, const TwitterRequestEr
 
 static TwitterImType twitter_conv_name_to_type(PurpleAccount *account, const char *name)
 {
-	g_return_val_if_fail(name != NULL && name[0] != '\0', TWITTER_IM_UNKNOWN);
+	g_return_val_if_fail(name != NULL && name[0] != '\0', TWITTER_IM_TYPE_UNKNOWN);
 	if (name[0] == '@')
 		return TWITTER_IM_TYPE_AT_MSG;
 	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')

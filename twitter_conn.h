@@ -28,6 +28,7 @@ typedef struct
 	GHashTable *user_reply_id_table;
 
 	gboolean requesting;
+	TwitterEndpointIm *endpoint_ims[TWITTER_IM_TYPE_UNKNOWN];
 	TwitterEndpointIm *replies_context;
 } TwitterConnectionData;
 

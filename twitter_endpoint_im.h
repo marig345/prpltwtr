@@ -9,7 +9,7 @@ typedef enum
 {
 	TWITTER_IM_TYPE_AT_MSG = 0,
 	TWITTER_IM_TYPE_DM = 1,
-	TWITTER_IM_UNKNOWN = 2,
+	TWITTER_IM_TYPE_UNKNOWN = 2,
 } TwitterImType;
 
 typedef void (*TwitterApiImAllFunc) (PurpleAccount *account,
