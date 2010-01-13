@@ -161,7 +161,7 @@ GList *twitter_dms_node_parse(xmlnode *dms_node)
 		data->user = twitter_user_node_parse(xmlnode_get_child(dm_node, "sender"));
 		data->status = twitter_dm_node_parse(dm_node);
 
-		dms = g_list_append(dms, data);
+		dms = g_list_prepend(dms, data);
 
 	}
 	return dms;
