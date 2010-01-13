@@ -45,6 +45,12 @@ static void twitter_get_dms_all_cb(PurpleAccount *account, GList *nodes, gpointe
 static gboolean twitter_get_dms_all_timeout_error_cb(PurpleAccount *account,
 		const TwitterRequestErrorData *error_data,
 		gpointer user_data);
+static void twitter_get_replies_last_since_id(PurpleAccount *account,
+		void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
+		void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
+		gpointer user_data);
+static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, long long id, gpointer user_data);
+static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
 
 static TwitterEndpointImSettings TwitterEndpointReplySettings =
 {
@@ -54,6 +60,7 @@ static TwitterEndpointImSettings TwitterEndpointReplySettings =
 	twitter_api_get_replies_all,
 	twitter_get_replies_all_cb,
 	twitter_get_replies_all_timeout_error_cb,
+	twitter_get_replies_last_since_id,
 };
 
 static TwitterEndpointImSettings TwitterEndpointDmSettings =
@@ -64,6 +71,7 @@ static TwitterEndpointImSettings TwitterEndpointDmSettings =
 	twitter_api_get_dms_all,
 	twitter_get_dms_all_cb,
 	twitter_get_dms_all_timeout_error_cb,
+	NULL,// twitter_get_dms_last_since_id,
 };
 
 static long long twitter_account_get_last_reply_id(PurpleAccount *account)
@@ -676,16 +684,16 @@ static void twitter_connected(PurpleAccount *account)
 			get_saved_searches_cb, NULL, NULL);
 
 	/* Install periodic timers to retrieve replies and dms */
-	twitter_connection_foreach_endpoint_im(twitter, twitter_endpoint_im_start_foreach, NULL);
+	//twitter_connection_foreach_endpoint_im(twitter, twitter_endpoint_im_start_foreach, NULL);
 
 	/* Immediately retrieve replies */
-	twitter_api_get_replies (account,
+	/*twitter_api_get_replies (account,
 			twitter_endpoint_im_get_since_id(replies_context),
 			TWITTER_INITIAL_REPLIES_COUNT, 1,
 			twitter_get_replies_cb,
 			twitter_get_replies_timeout_error_cb,
-			NULL);
-
+			NULL);*/
+	twitter_endpoint_im_start(replies_context);
 
 	int get_friends_timer_timeout = twitter_option_user_status_timeout(account);
 	gboolean get_following = twitter_option_get_following(account);
@@ -925,29 +933,12 @@ static GList *twitter_actions(PurplePlugin *plugin, gpointer context)
 
 static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, long long id, gpointer user_data)
 {
-	PurpleConnection *gc = purple_account_get_connection(acct);
+	TwitterEndpointIm *im = user_data;
 
-	if (purple_connection_get_state(gc) == PURPLE_CONNECTING)
-	{
-		if (id > twitter_account_get_last_reply_id(acct))
-			twitter_account_set_last_reply_id(acct, id);
+	if (id > twitter_account_get_last_reply_id(acct))
+		twitter_account_set_last_reply_id(acct, id);
 
-		purple_connection_update_progress(gc, "Connecting...",
-				1,   /* which connection step this is */
-				3);  /* total number of steps */
-
-	}
-
-	if (twitter_option_get_following(acct))
-	{
-		twitter_api_get_friends(acct,
-				twitter_get_friends_verify_connection_cb,
-				twitter_get_friends_verify_error_cb,
-				NULL);
-	} else {
-		twitter_connected(acct);
-		twitter_set_all_buddies_online(acct);
-	}
+	twitter_endpoint_im_start(im);
 }
 
 typedef struct 
@@ -986,7 +977,25 @@ static void twitter_get_replies_get_last_since_id_error_cb(PurpleAccount *accoun
 
 static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
-	twitter_verify_connection_error_handler(acct, error_data);
+	//TODO XXX retry, timed
+	//twitter_verify_connection_error_handler(acct, error_data);
+}
+
+static void twitter_get_replies_last_since_id(PurpleAccount *account,
+	void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
+	void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
+	gpointer user_data)
+{
+	TwitterLastSinceIdRequest *request = g_new0(TwitterLastSinceIdRequest, 1);
+	request->success_cb = success_cb;
+	request->error_cb = error_cb;
+	request->user_data = user_data;
+	/* Simply get the last reply */
+	twitter_api_get_replies(account,
+			0, 1, 1,
+			twitter_get_replies_get_last_since_id_success_cb,
+			twitter_get_replies_get_last_since_id_error_cb,
+			request);
 }
 
 static void twitter_verify_connection(PurpleAccount *acct)
@@ -1001,36 +1010,24 @@ static void twitter_verify_connection(PurpleAccount *acct)
 	retrieve_history = twitter_option_get_history(acct);
 
 	//If we don't have a stored last reply id, we don't want to get the entire history (EVERY reply)
-	if (retrieve_history && twitter_account_get_last_reply_id(acct) > 0) {
-		PurpleConnection *gc = purple_account_get_connection(acct);
+	PurpleConnection *gc = purple_account_get_connection(acct);
 
-		if (purple_connection_get_state(gc) == PURPLE_CONNECTING) {
+	if (purple_connection_get_state(gc) == PURPLE_CONNECTING) {
 
-			purple_connection_update_progress(gc, "Connecting...",
-					1,   /* which connection step this is */
-					3);  /* total number of steps */
-		}
+		purple_connection_update_progress(gc, "Connecting...",
+				1,   /* which connection step this is */
+				3);  /* total number of steps */
+	}
 
-		if (twitter_option_get_following(acct))
-		{
-			twitter_api_get_friends(acct,
-					twitter_get_friends_verify_connection_cb,
-					twitter_get_friends_verify_error_cb,
-					NULL);
-		} else {
-			twitter_connected(acct);
-			twitter_set_all_buddies_online(acct);
-		}
+	if (twitter_option_get_following(acct))
+	{
+		twitter_api_get_friends(acct,
+				twitter_get_friends_verify_connection_cb,
+				twitter_get_friends_verify_error_cb,
+				NULL);
 	} else {
-		TwitterLastSinceIdRequest *request = g_new0(TwitterLastSinceIdRequest, 1);
-		request->success_cb = twitter_get_replies_verify_connection_cb;
-		request->error_cb = twitter_get_replies_verify_connection_error_cb;
-		/* Simply get the last reply */
-		twitter_api_get_replies(acct,
-				0, 1, 1,
-				twitter_get_replies_get_last_since_id_success_cb,
-				twitter_get_replies_get_last_since_id_error_cb,
-				request);
+		twitter_connected(acct);
+		twitter_set_all_buddies_online(acct);
 	}
 }
 

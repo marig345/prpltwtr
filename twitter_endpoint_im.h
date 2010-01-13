@@ -26,6 +26,10 @@ typedef struct
 	TwitterApiImAllFunc get_im_func;
 	TwitterSendRequestMultiPageAllSuccessFunc success_cb;
 	TwitterSendRequestMultiPageAllErrorFunc error_cb;
+	void (*get_last_since_id)(PurpleAccount *account,
+			void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
+			void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
+			gpointer user_data);
 } TwitterEndpointImSettings;
 
 typedef struct

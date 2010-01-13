@@ -1,5 +1,7 @@
 #include "twitter_endpoint_im.h"
 #include "twitter_util.h"
+static void twitter_endpoint_im_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
+static void twitter_endpoint_im_start_timer(TwitterEndpointIm *ctx);
 
 TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings)
 {
@@ -25,7 +27,7 @@ static gboolean twitter_endpoint_im_error_cb(PurpleAccount *account,
 	TwitterEndpointIm *ctx = (TwitterEndpointIm *) user_data;
 	if (ctx->settings->error_cb(account, error_data, NULL))
 	{
-		twitter_endpoint_im_start(ctx);
+		twitter_endpoint_im_start_timer(ctx);
 	}
 	return FALSE;
 }
@@ -37,7 +39,7 @@ static void twitter_endpoint_im_success_cb(PurpleAccount *account,
 {
 	TwitterEndpointIm *ctx = (TwitterEndpointIm *) user_data;
 	ctx->settings->success_cb(account, nodes, NULL);
-	twitter_endpoint_im_start(ctx);
+	twitter_endpoint_im_start_timer(ctx);
 }
 
 static gboolean twitter_im_timer_timeout(gpointer _ctx)
@@ -50,15 +52,54 @@ static gboolean twitter_im_timer_timeout(gpointer _ctx)
 	return FALSE;
 }
 
+static void twitter_endpoint_im_get_last_since_id_success_cb(PurpleAccount *account, long long id, gpointer user_data)
+{
+	TwitterEndpointIm *im = user_data;
+
+	if (id > twitter_endpoint_im_get_since_id(im))
+		twitter_endpoint_im_set_since_id(im, id);
+
+	twitter_endpoint_im_start_timer(im);
+}
+
+static gboolean twitter_endpoint_im_get_since_id_timeout(gpointer user_data)
+{
+	TwitterEndpointIm *ctx = user_data;
+	ctx->settings->get_last_since_id(ctx->account,
+			twitter_endpoint_im_get_last_since_id_success_cb,
+			twitter_endpoint_im_get_last_since_id_error_cb,
+			ctx);
+	ctx->timer = 0;
+	return FALSE;
+}
+static void twitter_endpoint_im_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+{
+	TwitterEndpointIm *ctx = user_data;
+	ctx->timer = purple_timeout_add_seconds(60, twitter_endpoint_im_get_since_id_timeout, ctx);
+}
+
+static void twitter_endpoint_im_start_timer(TwitterEndpointIm *ctx)
+{
+	ctx->timer = purple_timeout_add_seconds(
+			60 * ctx->settings->timespan_func(ctx->account),
+			twitter_im_timer_timeout, ctx);
+}
+
 void twitter_endpoint_im_start(TwitterEndpointIm *ctx)
 {
 	if (ctx->timer)
 	{
 		purple_timeout_remove(ctx->timer);
 	}
-	ctx->timer = purple_timeout_add_seconds(
-			60 * ctx->settings->timespan_func(ctx->account),
-			twitter_im_timer_timeout, ctx);
+	if (twitter_endpoint_im_get_since_id(ctx) == -1)
+	{
+		ctx->settings->get_last_since_id(ctx->account,
+				twitter_endpoint_im_get_last_since_id_success_cb,
+				twitter_endpoint_im_get_last_since_id_error_cb,
+				ctx);
+	} else {
+		twitter_im_timer_timeout(ctx);
+	}
 }
 
 long long twitter_endpoint_im_get_since_id(TwitterEndpointIm *ctx)
