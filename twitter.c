@@ -49,8 +49,10 @@ static void twitter_get_replies_last_since_id(PurpleAccount *account,
 		void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
 		void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
 		gpointer user_data);
-static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, long long id, gpointer user_data);
-static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
+static void twitter_get_dms_last_since_id(PurpleAccount *account,
+	void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
+	void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
+	gpointer user_data);
 
 static TwitterEndpointImSettings TwitterEndpointReplySettings =
 {
@@ -71,18 +73,8 @@ static TwitterEndpointImSettings TwitterEndpointDmSettings =
 	twitter_api_get_dms_all,
 	twitter_get_dms_all_cb,
 	twitter_get_dms_all_timeout_error_cb,
-	NULL,// twitter_get_dms_last_since_id,
+	twitter_get_dms_last_since_id,
 };
-
-static long long twitter_account_get_last_reply_id(PurpleAccount *account)
-{
-	return twitter_endpoint_im_settings_load_since_id(account, &TwitterEndpointReplySettings);
-}
-
-static void twitter_account_set_last_reply_id(PurpleAccount *account, long long reply_id)
-{
-	return twitter_endpoint_im_settings_save_since_id(account, &TwitterEndpointReplySettings, reply_id);
-}
 
 
 /******************************************************
@@ -651,12 +643,10 @@ static void twitter_connected(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
-	TwitterEndpointIm *replies_context;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	replies_context = twitter_endpoint_im_new(account, &TwitterEndpointReplySettings);
-	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_AT_MSG, replies_context);
+	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_AT_MSG, twitter_endpoint_im_new(account, &TwitterEndpointReplySettings));
 	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_DM, twitter_endpoint_im_new(account, &TwitterEndpointDmSettings));
 
 #if _HAZE_
@@ -684,7 +674,7 @@ static void twitter_connected(PurpleAccount *account)
 			get_saved_searches_cb, NULL, NULL);
 
 	/* Install periodic timers to retrieve replies and dms */
-	//twitter_connection_foreach_endpoint_im(twitter, twitter_endpoint_im_start_foreach, NULL);
+	twitter_connection_foreach_endpoint_im(twitter, twitter_endpoint_im_start_foreach, NULL);
 
 	/* Immediately retrieve replies */
 	/*twitter_api_get_replies (account,
@@ -693,7 +683,6 @@ static void twitter_connected(PurpleAccount *account)
 			twitter_get_replies_cb,
 			twitter_get_replies_timeout_error_cb,
 			NULL);*/
-	twitter_endpoint_im_start(replies_context);
 
 	int get_friends_timer_timeout = twitter_option_user_status_timeout(account);
 	gboolean get_following = twitter_option_get_following(account);
@@ -931,16 +920,6 @@ static GList *twitter_actions(PurplePlugin *plugin, gpointer context)
 }
 
 
-static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, long long id, gpointer user_data)
-{
-	TwitterEndpointIm *im = user_data;
-
-	if (id > twitter_account_get_last_reply_id(acct))
-		twitter_account_set_last_reply_id(acct, id);
-
-	twitter_endpoint_im_start(im);
-}
-
 typedef struct 
 {
 	void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data);
@@ -968,17 +947,11 @@ static void twitter_get_replies_get_last_since_id_success_cb(PurpleAccount *acco
 	g_free(r);
 }
 
-static void twitter_get_replies_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+static void twitter_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	TwitterLastSinceIdRequest *r = user_data;
 	r->error_cb(account, error_data, r->user_data);
 	g_free(r);
-}
-
-static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
-{
-	//TODO XXX retry, timed
-	//twitter_verify_connection_error_handler(acct, error_data);
 }
 
 static void twitter_get_replies_last_since_id(PurpleAccount *account,
@@ -994,7 +967,44 @@ static void twitter_get_replies_last_since_id(PurpleAccount *account,
 	twitter_api_get_replies(account,
 			0, 1, 1,
 			twitter_get_replies_get_last_since_id_success_cb,
-			twitter_get_replies_get_last_since_id_error_cb,
+			twitter_get_last_since_id_error_cb,
+			request);
+}
+
+static void twitter_get_dms_get_last_since_id_success_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+{
+	TwitterLastSinceIdRequest *r = user_data;
+	long long id = 0;
+	xmlnode *status_node = xmlnode_get_child(node, "direct_message");
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+	if (status_node != NULL)
+	{
+		TwitterStatusData *status_data = twitter_dm_node_parse(status_node);
+		if (status_data != NULL)
+		{
+			id = status_data->id;
+
+			twitter_status_data_free(status_data);
+		}
+	}
+	r->success_cb(account, id, r->user_data);
+	g_free(r);
+}
+
+static void twitter_get_dms_last_since_id(PurpleAccount *account,
+	void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
+	void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
+	gpointer user_data)
+{
+	TwitterLastSinceIdRequest *request = g_new0(TwitterLastSinceIdRequest, 1);
+	request->success_cb = success_cb;
+	request->error_cb = error_cb;
+	request->user_data = user_data;
+	/* Simply get the last reply */
+	twitter_api_get_dms(account,
+			0, 1, 1,
+			twitter_get_dms_get_last_since_id_success_cb,
+			twitter_get_last_since_id_error_cb,
 			request);
 }
 

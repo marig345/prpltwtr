@@ -44,6 +44,13 @@ void twitter_api_get_home_timeline(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data);
 
+void twitter_api_get_dms(PurpleAccount *account,
+		long long since_id,
+		int count,
+		int page,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data);
 
 void twitter_api_get_dms_all(PurpleAccount *account,
 		long long since_id,

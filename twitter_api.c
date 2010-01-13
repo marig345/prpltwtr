@@ -143,6 +143,28 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 	g_free(query);
 }
 
+void twitter_api_get_dms(PurpleAccount *account,
+		long long since_id,
+		int count,
+		int page,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data)
+{
+	char *query = since_id > 0 ?
+		g_strdup_printf("count=%d&page=%d&since_id=%lld", count, page, since_id) :
+		g_strdup_printf("count=%d&page=%d", count, page);
+
+	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+
+	twitter_send_request(account, FALSE,
+			twitter_option_host_url(account),
+			"/direct_messages.xml", query,
+			success_func, error_func, data);
+
+	g_free(query);
+}
+
 void twitter_api_get_dms_all(PurpleAccount *account,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
