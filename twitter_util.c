@@ -13,7 +13,7 @@ long long purple_account_get_long_long(PurpleAccount *account, const gchar *key,
 	if(tmp_str)
 		return strtoll(tmp_str, NULL, 10);
 	else
-		return 0;
+		return default_value;
 }
 
 void purple_account_set_long_long(PurpleAccount *account, const gchar *key, long long value)

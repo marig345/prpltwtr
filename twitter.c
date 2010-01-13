@@ -922,26 +922,15 @@ static GList *twitter_actions(PurplePlugin *plugin, gpointer context)
 	return l;
 }
 
-static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, xmlnode *node, gpointer user_data)
+
+static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, long long id, gpointer user_data)
 {
 	PurpleConnection *gc = purple_account_get_connection(acct);
 
 	if (purple_connection_get_state(gc) == PURPLE_CONNECTING)
 	{
-		long long id = 0;
-		xmlnode *status_node = xmlnode_get_child(node, "status");
-		if (status_node != NULL)
-		{
-			TwitterStatusData *status_data = twitter_status_node_parse(status_node);
-			if (status_data != NULL)
-			{
-				id = status_data->id;
-
-				twitter_status_data_free(status_data);
-				if (id > twitter_account_get_last_reply_id(acct))
-					twitter_account_set_last_reply_id(acct, id);
-			}
-		}
+		if (id > twitter_account_get_last_reply_id(acct))
+			twitter_account_set_last_reply_id(acct, id);
 
 		purple_connection_update_progress(gc, "Connecting...",
 				1,   /* which connection step this is */
@@ -961,6 +950,40 @@ static void twitter_get_replies_verify_connection_cb(PurpleAccount *acct, xmlnod
 	}
 }
 
+typedef struct 
+{
+	void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data);
+	void (*error_cb)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
+	gpointer user_data;
+} TwitterLastSinceIdRequest;
+
+static void twitter_get_replies_get_last_since_id_success_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+{
+	TwitterLastSinceIdRequest *r = user_data;
+	long long id = 0;
+	xmlnode *status_node = xmlnode_get_child(node, "status");
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+	if (status_node != NULL)
+	{
+		TwitterStatusData *status_data = twitter_status_node_parse(status_node);
+		if (status_data != NULL)
+		{
+			id = status_data->id;
+
+			twitter_status_data_free(status_data);
+		}
+	}
+	r->success_cb(account, id, r->user_data);
+	g_free(r);
+}
+
+static void twitter_get_replies_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+{
+	TwitterLastSinceIdRequest *r = user_data;
+	r->error_cb(account, error_data, r->user_data);
+	g_free(r);
+}
+
 static void twitter_get_replies_verify_connection_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	twitter_verify_connection_error_handler(acct, error_data);
@@ -978,7 +1001,7 @@ static void twitter_verify_connection(PurpleAccount *acct)
 	retrieve_history = twitter_option_get_history(acct);
 
 	//If we don't have a stored last reply id, we don't want to get the entire history (EVERY reply)
-	if (retrieve_history && twitter_account_get_last_reply_id(acct) != 0) {
+	if (retrieve_history && twitter_account_get_last_reply_id(acct) > 0) {
 		PurpleConnection *gc = purple_account_get_connection(acct);
 
 		if (purple_connection_get_state(gc) == PURPLE_CONNECTING) {
@@ -998,14 +1021,16 @@ static void twitter_verify_connection(PurpleAccount *acct)
 			twitter_connected(acct);
 			twitter_set_all_buddies_online(acct);
 		}
-	}
-	else {
+	} else {
+		TwitterLastSinceIdRequest *request = g_new0(TwitterLastSinceIdRequest, 1);
+		request->success_cb = twitter_get_replies_verify_connection_cb;
+		request->error_cb = twitter_get_replies_verify_connection_error_cb;
 		/* Simply get the last reply */
 		twitter_api_get_replies(acct,
 				0, 1, 1,
-				twitter_get_replies_verify_connection_cb,
-				twitter_get_replies_verify_connection_error_cb,
-				NULL);
+				twitter_get_replies_get_last_since_id_success_cb,
+				twitter_get_replies_get_last_since_id_error_cb,
+				request);
 	}
 }
 
