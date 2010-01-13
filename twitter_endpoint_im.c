@@ -63,7 +63,7 @@ void twitter_endpoint_im_start(TwitterEndpointIm *ctx)
 
 long long twitter_endpoint_im_get_since_id(TwitterEndpointIm *ctx)
 {
-	return (ctx->since_id 
+	return (ctx->since_id > 0
 			? ctx->since_id 
 			: twitter_endpoint_im_settings_load_since_id(ctx->account, ctx->settings));
 }
@@ -76,7 +76,7 @@ void twitter_endpoint_im_set_since_id(TwitterEndpointIm *ctx, long long since_id
 
 long long twitter_endpoint_im_settings_load_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings)
 {
-	return purple_account_get_long_long(account, settings->since_id_setting_id, 0);
+	return purple_account_get_long_long(account, settings->since_id_setting_id, -1);
 }
 
 void twitter_endpoint_im_settings_save_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings, long long since_id)
