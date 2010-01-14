@@ -16,6 +16,7 @@ typedef void (*TwitterApiImAllFunc) (PurpleAccount *account,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
 		gpointer data);
 
 typedef struct

@@ -56,12 +56,14 @@ void twitter_api_get_dms_all(PurpleAccount *account,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
 		gpointer data);
 
 void twitter_api_get_replies_all(PurpleAccount *account,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
 		gpointer data);
 
 void twitter_api_get_replies(PurpleAccount *account,

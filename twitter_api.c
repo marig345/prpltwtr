@@ -126,6 +126,7 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
 		gpointer data)
 {
 	int count = TWITTER_EVERY_REPLIES_COUNT;
@@ -135,11 +136,11 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	twitter_send_request_multipage_all(account,
+	twitter_send_request_multipage_all_max_count(account,
 			twitter_option_host_url(account),
 			"/statuses/mentions.xml", query,
 			success_func, error_func,
-			count, data);
+			count, max_count, data);
 	g_free(query);
 }
 
@@ -169,6 +170,7 @@ void twitter_api_get_dms_all(PurpleAccount *account,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
 		gpointer data)
 {
 	int count = TWITTER_EVERY_DMS_COUNT;
@@ -178,11 +180,11 @@ void twitter_api_get_dms_all(PurpleAccount *account,
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	twitter_send_request_multipage_all(account,
+	twitter_send_request_multipage_all_max_count(account,
 			twitter_option_host_url(account),
 			"/direct_messages.xml", query,
 			success_func, error_func,
-			count, data);
+			count, max_count, data);
 	g_free(query);
 }
 

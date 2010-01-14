@@ -8,6 +8,8 @@ TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpoi
 	TwitterEndpointIm *endpoint = g_new0(TwitterEndpointIm, 1);
 	endpoint->account = account;
 	endpoint->settings = settings;
+	endpoint->retrieve_history = retrieve_history;
+	endpoint->initial_max_retrieve = initial_max_retrieve;
 	return endpoint;
 }
 void twitter_endpoint_im_free(TwitterEndpointIm *ctx)
@@ -39,15 +41,19 @@ static void twitter_endpoint_im_success_cb(PurpleAccount *account,
 {
 	TwitterEndpointIm *ctx = (TwitterEndpointIm *) user_data;
 	ctx->settings->success_cb(account, nodes, NULL);
+	ctx->ran_once = TRUE;
 	twitter_endpoint_im_start_timer(ctx);
 }
 
 static gboolean twitter_im_timer_timeout(gpointer _ctx)
 {
 	TwitterEndpointIm *ctx = (TwitterEndpointIm *) _ctx;
-	ctx->settings->get_im_func(ctx->account, twitter_endpoint_im_get_since_id(ctx),
-		twitter_endpoint_im_success_cb, twitter_endpoint_im_error_cb,
-		ctx);
+	ctx->settings->get_im_func(ctx->account,
+			twitter_endpoint_im_get_since_id(ctx),
+			twitter_endpoint_im_success_cb,
+			twitter_endpoint_im_error_cb,
+			ctx->ran_once ? -1 : ctx->initial_max_retrieve,
+			ctx);
 	ctx->timer = 0;
 	return FALSE;
 }
@@ -59,6 +65,7 @@ static void twitter_endpoint_im_get_last_since_id_success_cb(PurpleAccount *acco
 	if (id > twitter_endpoint_im_get_since_id(im))
 		twitter_endpoint_im_set_since_id(im, id);
 
+	im->ran_once = TRUE;
 	twitter_endpoint_im_start_timer(im);
 }
 
