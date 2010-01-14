@@ -646,8 +646,18 @@ static void twitter_connected(PurpleAccount *account)
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_AT_MSG, twitter_endpoint_im_new(account, &TwitterEndpointReplySettings));
-	twitter_connection_set_endpoint_im(twitter, TWITTER_IM_TYPE_DM, twitter_endpoint_im_new(account, &TwitterEndpointDmSettings));
+	twitter_connection_set_endpoint_im(twitter,
+			TWITTER_IM_TYPE_AT_MSG,
+			twitter_endpoint_im_new(account,
+				&TwitterEndpointReplySettings,
+				twitter_option_get_history(account),
+				TWITTER_INITIAL_REPLIES_COUNT));
+	twitter_connection_set_endpoint_im(twitter,
+			TWITTER_IM_TYPE_DM,
+			twitter_endpoint_im_new(account,
+				&TwitterEndpointDmSettings,
+				twitter_option_get_history(account),
+				TWITTER_INITIAL_REPLIES_COUNT));
 
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",

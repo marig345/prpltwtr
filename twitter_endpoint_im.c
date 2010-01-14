@@ -3,7 +3,7 @@
 static void twitter_endpoint_im_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 static void twitter_endpoint_im_start_timer(TwitterEndpointIm *ctx);
 
-TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings)
+TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings, gboolean retrieve_history, gint initial_max_retrieve)
 {
 	TwitterEndpointIm *endpoint = g_new0(TwitterEndpointIm, 1);
 	endpoint->account = account;
@@ -91,7 +91,7 @@ void twitter_endpoint_im_start(TwitterEndpointIm *ctx)
 	{
 		purple_timeout_remove(ctx->timer);
 	}
-	if (twitter_endpoint_im_get_since_id(ctx) == -1)
+	if (twitter_endpoint_im_get_since_id(ctx) == -1 && ctx->retrieve_history)
 	{
 		ctx->settings->get_last_since_id(ctx->account,
 				twitter_endpoint_im_get_last_since_id_success_cb,

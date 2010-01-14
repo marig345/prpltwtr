@@ -35,12 +35,17 @@ typedef struct
 typedef struct
 {
 	PurpleAccount *account;
-	guint timer;
 	long long since_id;
+	gboolean retrieve_history;
+	gint initial_max_retrieve;
 	TwitterEndpointImSettings *settings;
+
+	//these should be 'private'
+	guint timer;
+	gboolean ran_once;
 } TwitterEndpointIm;
 
-TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings);
+TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings, gboolean retrieve_history, gint initial_max_retrieve);
 void twitter_endpoint_im_free(TwitterEndpointIm *ctx);
 
 void twitter_endpoint_im_settings_save_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings, long long since_id);
