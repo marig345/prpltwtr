@@ -276,10 +276,11 @@ void twitter_send_request_multipage_error_cb(PurpleAccount *account, const Twitt
 void twitter_send_request_multipage_do(PurpleAccount *account,
 		TwitterMultiPageRequestData *request_data)
 {
-	char *full_query_string = g_strdup_printf("%s%spage=%d",
+	char *full_query_string = g_strdup_printf("%s%spage=%d&count=%d",
 			request_data->query_string ? request_data->query_string : "",
 			request_data->query_string && strlen(request_data->query_string) > 0 ? "&" : "",
-			request_data->page);
+			request_data->page,
+			request_data->expected_count);
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s: page: %d\n", G_STRFUNC, request_data->page);
 
@@ -290,7 +291,6 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 	g_free(full_query_string);
 }
 
-//don't include count in the query_string
 void twitter_send_request_multipage(PurpleAccount *account,
 		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestMultiPageSuccessFunc success_callback,

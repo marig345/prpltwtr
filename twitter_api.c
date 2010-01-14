@@ -88,8 +88,8 @@ void twitter_api_get_home_timeline_all(PurpleAccount *account,
 {
 	int count_per_page = TWITTER_HOME_TIMELINE_PAGE_COUNT;
 	char *query = since_id > 0 ?
-		g_strdup_printf ("since_id=%lld&count=%d", since_id, count_per_page) :
-		g_strdup_printf ("count=%d", count_per_page);
+		g_strdup_printf ("since_id=%lld", since_id) :
+		NULL;
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -98,7 +98,8 @@ void twitter_api_get_home_timeline_all(PurpleAccount *account,
 			"/1/statuses/home_timeline.xml", query,
 			success_func, error_func,
 			count_per_page, max_count, data);
-	g_free(query);
+	if (query)
+		g_free(query);
 }
 void twitter_api_get_replies(PurpleAccount *account,
 		long long since_id,
@@ -131,8 +132,8 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 {
 	int count = TWITTER_EVERY_REPLIES_COUNT;
 	char *query = since_id > 0 ?
-		g_strdup_printf ("since_id=%lld&count=%d", since_id, count) :
-		g_strdup_printf ("count=%d", count);
+		g_strdup_printf ("since_id=%lld", since_id) :
+		NULL;
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -141,7 +142,8 @@ void twitter_api_get_replies_all(PurpleAccount *account,
 			"/statuses/mentions.xml", query,
 			success_func, error_func,
 			count, max_count, data);
-	g_free(query);
+	if (query)
+		g_free(query);
 }
 
 void twitter_api_get_dms(PurpleAccount *account,
@@ -175,8 +177,8 @@ void twitter_api_get_dms_all(PurpleAccount *account,
 {
 	int count = TWITTER_EVERY_DMS_COUNT;
 	char *query = since_id > 0 ?
-		g_strdup_printf ("since_id=%lld&count=%d", since_id, count) :
-		g_strdup_printf ("count=%d", count);
+		g_strdup_printf ("since_id=%lld", since_id) :
+		NULL;
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -185,7 +187,8 @@ void twitter_api_get_dms_all(PurpleAccount *account,
 			"/direct_messages.xml", query,
 			success_func, error_func,
 			count, max_count, data);
-	g_free(query);
+	if (query)
+		g_free(query);
 }
 
 void twitter_api_set_status(PurpleAccount *account,
