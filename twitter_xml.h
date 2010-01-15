@@ -36,7 +36,7 @@ typedef struct
 {
 	TwitterTweet *status;
 	TwitterUserData *user;
-} TwitterBuddyData;
+} TwitterUserTweet;
 
 gchar *xmlnode_get_child_data(const xmlnode *node, const char *name);
 TwitterUserData *twitter_user_node_parse(xmlnode *user_node);

@@ -283,7 +283,7 @@ static void twitter_buddy_datas_set_all(PurpleAccount *account, GList *buddy_dat
 	GList *l;
 	for (l = buddy_datas; l; l = l->next)
 	{
-		TwitterBuddyData *data = l->data;
+		TwitterUserTweet *data = l->data;
 		TwitterUserData *user = data->user;
 		TwitterTweet *status = data->status;
 		char *screen_name = g_strdup(user->screen_name);
@@ -327,7 +327,7 @@ static void _process_replies (PurpleAccount *account,
 
 	for (l = statuses; l; l = l->next)
 	{
-		TwitterBuddyData *data = l->data;
+		TwitterUserTweet *data = l->data;
 		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
 		g_free(data);
@@ -361,7 +361,7 @@ static void _process_dms(PurpleAccount *account,
 
 	for (l = statuses; l; l = l->next)
 	{
-		TwitterBuddyData *data = l->data;
+		TwitterUserTweet *data = l->data;
 		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
 		g_free(data);
@@ -1272,7 +1272,7 @@ static void twitter_get_info(PurpleConnection *gc, const char *username) {
 
 	if (b)
 	{
-		TwitterBuddyData *data = twitter_buddy_get_buddy_data(b);
+		TwitterUserTweet *data = twitter_buddy_get_buddy_data(b);
 		if (data)
 		{
 			TwitterUserData *user_data = data->user;
@@ -1355,7 +1355,7 @@ static void twitter_add_buddies(PurpleConnection *gc, GList *buddies,
 static void twitter_remove_buddy(PurpleConnection *gc, PurpleBuddy *buddy,
 		PurpleGroup *group)
 {
-	TwitterBuddyData *twitter_buddy_data = buddy->proto_data;
+	TwitterUserTweet *twitter_buddy_data = buddy->proto_data;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "removing %s from %s's buddy list\n",
 			buddy->name, gc->account->username);

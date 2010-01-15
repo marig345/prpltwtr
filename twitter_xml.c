@@ -156,7 +156,7 @@ GList *twitter_dms_node_parse(xmlnode *dms_node)
 	xmlnode *dm_node;
 	for (dm_node = xmlnode_get_child(dms_node, "direct_message"); dm_node; dm_node = xmlnode_get_next_twin(dm_node))
 	{
-		TwitterBuddyData *data = g_new0(TwitterBuddyData, 1);
+		TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
 
 		data->user = twitter_user_node_parse(xmlnode_get_child(dm_node, "sender"));
 		data->status = twitter_dm_node_parse(dm_node);
@@ -187,7 +187,7 @@ GList *twitter_users_node_parse(xmlnode *users_node)
 	{
 		if (user_node->name && !strcmp(user_node->name, "user"))
 		{
-			TwitterBuddyData *data = g_new0(TwitterBuddyData, 1);
+			TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
 
 			xmlnode *status_node = xmlnode_get_child(user_node, "status");
 
@@ -220,7 +220,7 @@ GList *twitter_statuses_node_parse(xmlnode *statuses_node)
 	{
 		if (status_node->name && !strcmp(status_node->name, "status"))
 		{
-			TwitterBuddyData *data = g_new0(TwitterBuddyData, 1);
+			TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
 			xmlnode *user_node = xmlnode_get_child(status_node, "user");
 			data->user = twitter_user_node_parse(user_node);
 			data->status = twitter_status_node_parse(status_node);
