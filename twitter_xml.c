@@ -150,7 +150,7 @@ TwitterTweet *twitter_dm_node_parse(xmlnode *dm_node)
 	return twitter_status_node_parse(dm_node);
 }
 
-static TwitterUserTweet *twitter_user_tweet_new(const char *screen_name, TwitterUserData *user, TwitterTweet *tweet)
+TwitterUserTweet *twitter_user_tweet_new(const char *screen_name, TwitterUserData *user, TwitterTweet *tweet)
 {
 	TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
 
@@ -159,6 +159,33 @@ static TwitterUserTweet *twitter_user_tweet_new(const char *screen_name, Twitter
 	data->screen_name = g_strdup(screen_name);
 	
 	return data;
+}
+
+TwitterUserData *twitter_user_tweet_take_user_data(TwitterUserTweet *ut)
+{
+	TwitterUserData *data = ut->user;
+	ut->user = NULL;
+	return data;
+}
+
+TwitterTweet *twitter_user_tweet_take_tweet(TwitterUserTweet *ut)
+{
+	TwitterTweet *data = ut->status;
+	ut->status = NULL;
+	return data;
+}
+
+void twitter_user_tweet_free(TwitterUserTweet *ut)
+{
+	if (!ut)
+		return;
+	if (ut->user)
+		twitter_user_data_free(ut->user);
+	if (ut->status)
+		twitter_status_data_free(ut->status);
+	if (ut->screen_name)
+		g_free(ut->screen_name);
+	g_free(ut);
 }
 
 GList *twitter_dms_node_parse(xmlnode *dms_node)

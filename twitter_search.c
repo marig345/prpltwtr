@@ -37,10 +37,7 @@ static void _free_search_results (GArray *search_results)
 
 		search_data = g_array_index (search_results,
 				TwitterUserTweet *, i);
-		g_free (search_data->screen_name);
-		g_free (search_data->status->text);
-		g_free (search_data->status);
-		g_slice_free (TwitterUserTweet, search_data);
+		twitter_user_tweet_free(search_data);
 	}
 	g_array_free (search_results, TRUE);
 }
@@ -49,12 +46,12 @@ static TwitterUserTweet *twitter_search_entry_node_parse(xmlnode *entry_node)
 {
 	if (entry_node != NULL && entry_node->name && !strcmp(entry_node->name, "entry"))
 	{
-		TwitterUserTweet *entry = g_slice_new0(TwitterUserTweet);
+		TwitterUserTweet *entry;
 		TwitterTweet *tweet = g_new0(TwitterTweet, 1);
 		gchar *id_str = xmlnode_get_child_data(entry_node, "id"); //tag:search.twitter.com,2005:12345678
 		gchar *created_at_str = xmlnode_get_child_data(entry_node, "published"); //2009-12-24T19:29:24Z
 		gchar *screen_name_str = xmlnode_get_child_data(xmlnode_get_child(entry_node, "author"), "name"); //username (USER NAME)
-		const gchar *ptr;
+		gchar *ptr;
 
 
 		ptr = g_strrstr(id_str, ":");
@@ -63,13 +60,10 @@ static TwitterUserTweet *twitter_search_entry_node_parse(xmlnode *entry_node)
 			tweet->id = strtoll(ptr + 1, NULL, 10);
 		}
 		ptr = strstr(screen_name_str, " ");
-		if (ptr == NULL)
-		{
-			entry->screen_name = screen_name_str;
-		} else {
-			entry->screen_name = g_strndup(screen_name_str, ptr - screen_name_str);
-			g_free(screen_name_str);
-		}
+		if (ptr)
+			ptr[0] = 0;
+		entry = twitter_user_tweet_new(screen_name_str, NULL, NULL);
+		g_free(screen_name_str);
 
 		tweet->text = xmlnode_get_child_data(entry_node, "title");
 		tweet->created_at = purple_str_to_time(created_at_str, TRUE, NULL, NULL, NULL);

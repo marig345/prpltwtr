@@ -52,4 +52,9 @@ GList *twitter_dms_nodes_parse(GList *nodes);
 void twitter_user_data_free(TwitterUserData *user_data);
 void twitter_status_data_free(TwitterTweet *status);
 
+TwitterUserTweet *twitter_user_tweet_new(const char *screen_name, TwitterUserData *user, TwitterTweet *tweet);
+TwitterUserData *twitter_user_tweet_take_user_data(TwitterUserTweet *ut);
+TwitterTweet *twitter_user_tweet_take_tweet(TwitterUserTweet *ut);
+void twitter_user_tweet_free(TwitterUserTweet *ut);
+
 #endif

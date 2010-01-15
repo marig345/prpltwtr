@@ -5,8 +5,7 @@ TwitterUserTweet *twitter_buddy_get_buddy_data(PurpleBuddy *b)
 {
 	if (b->proto_data == NULL)
 	{
-		TwitterUserTweet *twitter_buddy = g_new0(TwitterUserTweet, 1);
-		twitter_buddy->screen_name = g_strdup(b->name);
+		TwitterUserTweet *twitter_buddy = twitter_user_tweet_new(b->name, NULL, NULL);
 		b->proto_data = twitter_buddy;
 	}
 	return b->proto_data;
@@ -68,9 +67,7 @@ PurpleBuddy *twitter_buddy_new(PurpleAccount *account, const char *screenname, c
 	{
 		if (b->proto_data == NULL)
 		{
-			twitter_buddy = g_new0(TwitterUserTweet, 1);
-			twitter_buddy->screen_name = g_strdup(screenname);
-			b->proto_data = twitter_buddy;
+			b->proto_data = twitter_user_tweet_new(screenname, NULL, NULL);
 		}
 		return b;
 	}
@@ -81,8 +78,7 @@ PurpleBuddy *twitter_buddy_new(PurpleAccount *account, const char *screenname, c
 		g = purple_group_new(group_name);
 	b = purple_buddy_new(account, screenname, alias);
 	purple_blist_add_buddy(b, NULL, g, NULL);
-	twitter_buddy = g_new0(TwitterUserTweet, 1);
-	twitter_buddy->screen_name = g_strdup(screenname);
+	twitter_buddy = twitter_user_tweet_new(screenname, NULL, NULL);
 	b->proto_data = twitter_buddy;
 	return b;
 }
