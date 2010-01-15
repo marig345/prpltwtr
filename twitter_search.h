@@ -14,7 +14,7 @@ typedef struct _TwitterSearchErrorData TwitterSearchErrorData;
 struct _TwitterSearchData
 {
     char *text;
-    char *from_user;
+    char *screen_name;
     long long id;
     time_t created_at;
 };

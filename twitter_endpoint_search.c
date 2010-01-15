@@ -150,7 +150,7 @@ static void twitter_search_cb(PurpleAccount *account,
 				search_data = g_array_index (search_results,
 						TwitterSearchData *, i);
 
-				twitter_chat_add_tweet(chat, search_data->from_user, search_data->text, search_data->id, search_data->created_at);
+				twitter_chat_add_tweet(chat, search_data->screen_name, search_data->text, search_data->id, search_data->created_at);
 			}
 		} else {
 			purple_debug_info(TWITTER_PROTOCOL_ID, "%s could not find chat %s", G_STRFUNC, endpoint_chat->chat_name);

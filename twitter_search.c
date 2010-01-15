@@ -37,7 +37,7 @@ static void _free_search_results (GArray *search_results)
 
 		search_data = g_array_index (search_results,
 				TwitterSearchData *, i);
-		g_free (search_data->from_user);
+		g_free (search_data->screen_name);
 		g_free (search_data->text);
 		g_slice_free (TwitterSearchData, search_data);
 	}
@@ -51,7 +51,7 @@ static TwitterSearchData *twitter_search_entry_node_parse(xmlnode *entry_node)
 		TwitterSearchData *entry = g_slice_new0(TwitterSearchData);
 		gchar *id_str = xmlnode_get_child_data(entry_node, "id"); //tag:search.twitter.com,2005:12345678
 		gchar *created_at_str = xmlnode_get_child_data(entry_node, "published"); //2009-12-24T19:29:24Z
-		gchar *from_user_str = xmlnode_get_child_data(xmlnode_get_child(entry_node, "author"), "name"); //username (USER NAME)
+		gchar *screen_name_str = xmlnode_get_child_data(xmlnode_get_child(entry_node, "author"), "name"); //username (USER NAME)
 		const gchar *ptr;
 
 
@@ -60,13 +60,13 @@ static TwitterSearchData *twitter_search_entry_node_parse(xmlnode *entry_node)
 		{
 			entry->id = strtoll(ptr + 1, NULL, 10);
 		}
-		ptr = strstr(from_user_str, " ");
+		ptr = strstr(screen_name_str, " ");
 		if (ptr == NULL)
 		{
-			entry->from_user = from_user_str;
+			entry->screen_name = screen_name_str;
 		} else {
-			entry->from_user = g_strndup(from_user_str, ptr - from_user_str);
-			g_free(from_user_str);
+			entry->screen_name = g_strndup(screen_name_str, ptr - screen_name_str);
+			g_free(screen_name_str);
 		}
 
 		entry->text = xmlnode_get_child_data(entry_node, "title");
