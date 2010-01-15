@@ -36,6 +36,7 @@
 
 #include <debug.h>
 #include <request.h>
+#include "twitter_prefs.h"
 #include "twitter_request.h"
 #include "twitter_util.h"
 
@@ -52,21 +53,11 @@ typedef struct {
 
 typedef struct
 {
-	gpointer user_data;
-	char *host;
-	char *url;
-	char *query_string;
-	TwitterSendRequestMultiPageSuccessFunc success_callback;
-	TwitterSendRequestMultiPageErrorFunc error_callback;
-	int page;
-	int expected_count;
-} TwitterMultiPageRequestData;
-
-typedef struct
-{
 	GList *nodes;
 	TwitterSendRequestMultiPageAllSuccessFunc success_callback;
 	TwitterSendRequestMultiPageAllErrorFunc error_callback;
+	gint max_count;
+	gint current_count;
 	gpointer user_data;
 } TwitterMultiPageAllRequestData;
 
@@ -99,16 +90,16 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 	xmlnode *response_node = NULL;
 	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
 
-	purple_debug_info("twitter", "Response: %s\n", url_text);
-
 	if (server_error_message)
 	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: %s\n", server_error_message);
 		error_type = TWITTER_REQUEST_ERROR_SERVER;
 		error_message = server_error_message;
 	} else {
 		response_node = xmlnode_from_str(url_text, len);
 		if (!response_node)
 		{
+			purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: invalid xml\n");
 			error_type = TWITTER_REQUEST_ERROR_INVALID_XML;
 			error_message = url_text;
 		} else {
@@ -118,6 +109,7 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 				error_type = TWITTER_REQUEST_ERROR_TWITTER_GENERAL;
 				error_node_text = xmlnode_get_data(error_node);
 				error_message = error_node_text;
+				purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: Twitter error %s\n", error_message);
 			}
 		}
 	}
@@ -133,6 +125,7 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 
 		g_free(error_data);
 	} else {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
 		if (request_data->success_func)
 			request_data->success_func(request_data->account, response_node, request_data->user_data);
 	}
@@ -155,12 +148,15 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 	const char *sn = purple_account_get_username(account);
 	char *auth_text = g_strdup_printf("%s:%s", sn, pass);
 	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
-	gboolean use_https = purple_account_get_bool(account, "use_https", FALSE) && purple_ssl_is_supported();
+	gboolean use_https = twitter_option_use_https(account) && purple_ssl_is_supported();
 	TwitterSendRequestData *request_data = g_new0(TwitterSendRequestData, 1);
 	char *full_url = g_strdup_printf("%s://%s%s",
 			use_https ? "https" : "http",
 			host,
 			url);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s ? %s\n",
+			full_url,
+			query_string ? query_string : "");
 
 	request_data->account = account;
 	request_data->user_data = data;
@@ -192,6 +188,28 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 	g_free(request);
 }
 
+static int xmlnode_child_count(xmlnode *parent)
+{
+	/*xmlnode *child = parent->child;
+	int count = 0;
+
+	if (!child)
+		return 0;
+
+	while ((child = child->next) != NULL) {
+		if (child->name)
+			count++;
+	}*/
+	int count = 0;
+	xmlnode *child;
+	if (parent == NULL)
+		return 0;
+	for (child = parent->child; child; child = child->next)
+		if (child->name && child->type == XMLNODE_TYPE_TAG)
+			count++;
+	return count;
+}
+
 void twitter_send_request_multipage_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
 {
 	TwitterMultiPageRequestData *request_data = user_data;
@@ -208,7 +226,7 @@ void twitter_send_request_multipage_cb(PurpleAccount *account, xmlnode *node, gp
 	if (count < request_data->expected_count)
 		last_page = TRUE;
 
-	purple_debug_info("twitter--",
+	purple_debug_info(TWITTER_PROTOCOL_ID,
 			"%s: last_page: %s, count: %d, expected_count: %d\n",
 			G_STRFUNC, last_page?"yes":"no",
 			count, request_data->expected_count);
@@ -216,19 +234,23 @@ void twitter_send_request_multipage_cb(PurpleAccount *account, xmlnode *node, gp
 	if (!request_data->success_callback) {
 		get_next_page = TRUE;
 
-		purple_debug_info("twitter--",
+		purple_debug_info(TWITTER_PROTOCOL_ID,
 				"%s no request_data->success_callback, get_next_page: yes\n",
 				G_STRFUNC);
 	}
 	else {
-		get_next_page = request_data->success_callback(account, node, last_page, request_data->user_data);
+		get_next_page = request_data->success_callback(account,
+				node,
+				last_page,
+				request_data,
+				request_data->user_data);
 
-		purple_debug_info("twitter--",
+		purple_debug_info(TWITTER_PROTOCOL_ID,
 				"%s get_next_page: %s\n",
 				G_STRFUNC, get_next_page?"yes":"no");
 	}
 
-	if (last_page)
+	if (last_page || !get_next_page)
 	{
 		g_free(request_data->host);
 		g_free(request_data->url);
@@ -256,12 +278,13 @@ void twitter_send_request_multipage_error_cb(PurpleAccount *account, const Twitt
 void twitter_send_request_multipage_do(PurpleAccount *account,
 		TwitterMultiPageRequestData *request_data)
 {
-	char *full_query_string = g_strdup_printf("%s%spage=%d",
+	char *full_query_string = g_strdup_printf("%s%spage=%d&count=%d",
 			request_data->query_string ? request_data->query_string : "",
 			request_data->query_string && strlen(request_data->query_string) > 0 ? "&" : "",
-			request_data->page);
+			request_data->page,
+			request_data->expected_count);
 
-	purple_debug_info("twitter--", "%s: page: %d\n", G_STRFUNC, request_data->page);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s: page: %d\n", G_STRFUNC, request_data->page);
 
 	twitter_send_request(account, FALSE,
 			request_data->host, request_data->url, full_query_string,
@@ -270,7 +293,6 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 	g_free(full_query_string);
 }
 
-//don't include count in the query_string
 void twitter_send_request_multipage(PurpleAccount *account,
 		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestMultiPageSuccessFunc success_callback,
@@ -301,17 +323,27 @@ static void twitter_multipage_all_request_data_free(TwitterMultiPageAllRequestDa
 	g_free(request_data_all);
 }
 
-static gboolean twitter_send_request_multipage_all_success_cb(PurpleAccount *acct, xmlnode *node, gboolean last_page, gpointer user_data)
+static gboolean twitter_send_request_multipage_all_success_cb(PurpleAccount *acct,
+		xmlnode *node,
+		gboolean last_page,
+		TwitterMultiPageRequestData *request_multi,
+		gpointer user_data)
 {
 	TwitterMultiPageAllRequestData *request_data_all = user_data;
 
-	purple_debug_info ("twitter--", "%s\n", G_STRFUNC);
+	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 	request_data_all->nodes = g_list_prepend(request_data_all->nodes, xmlnode_copy(node)); //TODO: update
-	if (last_page)
+	request_data_all->current_count += xmlnode_child_count(node);
+
+	purple_debug_info (TWITTER_PROTOCOL_ID, "%s last_page: %d current_count: %d max_count: %d per page: %d\n", G_STRFUNC, last_page ? 1 : 0, request_data_all->current_count, request_data_all->max_count, request_multi->expected_count);
+	if (last_page || (request_data_all->max_count > 0 && request_data_all->current_count >= request_data_all->max_count))
 	{
 		request_data_all->success_callback(acct, request_data_all->nodes, request_data_all->user_data);
 		twitter_multipage_all_request_data_free(request_data_all);
+		return FALSE;
+	} else if (request_data_all->max_count > 0 && (request_data_all->current_count + request_multi->expected_count > request_data_all->max_count)) {
+		request_multi->expected_count = request_data_all->max_count - request_data_all->current_count;
 	}
 	return TRUE;
 }
@@ -325,17 +357,21 @@ static gboolean twitter_send_request_multipage_all_error_cb(PurpleAccount *acct,
 	return FALSE;
 }
 
-void twitter_send_request_multipage_all(PurpleAccount *account,
+void twitter_send_request_multipage_all_max_count(PurpleAccount *account,
 		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
-		int expected_count, gpointer data)
+		int expected_count, gint max_count, gpointer data)
 {
 	TwitterMultiPageAllRequestData *request_data_all = g_new0(TwitterMultiPageAllRequestData, 1);
 	request_data_all->success_callback = success_callback;
 	request_data_all->error_callback = error_callback;
 	request_data_all->nodes = NULL;
 	request_data_all->user_data = data;
+	request_data_all->max_count = max_count;
+
+	if (max_count > 0 && expected_count > max_count)
+		expected_count = max_count;
 
 	twitter_send_request_multipage(account,
 			host, url, query_string,
@@ -374,7 +410,7 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 	request_data->next_cursor = strtoll (next_cursor_str, NULL, 10);
 	g_free (next_cursor_str);
 
-	purple_debug_info ("twitter--", "%s next_cursor: %lld\n",
+	purple_debug_info (TWITTER_PROTOCOL_ID, "%s next_cursor: %lld\n",
 			G_STRFUNC, request_data->next_cursor);
 
 	users = xmlnode_get_child (node, "users");

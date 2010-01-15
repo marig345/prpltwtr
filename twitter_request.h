@@ -22,6 +22,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02111-1301  USA
  */
 
+#ifndef _TWITTER_REQUEST_H_
+#define _TWITTER_REQUEST_H_
+
 #include <glib.h>
 
 typedef enum
@@ -39,11 +42,27 @@ typedef struct
 	const gchar *message;
 } TwitterRequestErrorData;
 
+
 typedef void (*TwitterSendRequestSuccessFunc)(PurpleAccount *acct, xmlnode *node, gpointer user_data);
 typedef void (*TwitterSendRequestErrorFunc)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
 
-typedef gboolean (*TwitterSendRequestMultiPageSuccessFunc)(PurpleAccount *acct, xmlnode *node, gboolean last_page, gpointer user_data);
+typedef struct _TwitterMultiPageRequestData TwitterMultiPageRequestData;
+
+typedef gboolean (*TwitterSendRequestMultiPageSuccessFunc)(PurpleAccount *acct, xmlnode *node, gboolean last_page, TwitterMultiPageRequestData *request, gpointer user_data);
 typedef gboolean (*TwitterSendRequestMultiPageErrorFunc)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
+
+struct _TwitterMultiPageRequestData
+{
+	gpointer user_data;
+	char *host;
+	char *url;
+	char *query_string;
+	TwitterSendRequestMultiPageSuccessFunc success_callback;
+	TwitterSendRequestMultiPageErrorFunc error_callback;
+	int page;
+	int expected_count;
+};
+
 
 typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(PurpleAccount *acct, GList *nodes, gpointer user_data);
 typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
@@ -59,11 +78,16 @@ void twitter_send_request_multipage(PurpleAccount *account,
 		TwitterSendRequestMultiPageSuccessFunc success_callback, TwitterSendRequestMultiPageErrorFunc error_callback,
 		int expected_count, gpointer data);
 
-void twitter_send_request_multipage_all(PurpleAccount *account,
+void twitter_send_request_multipage_all_max_count(PurpleAccount *account,
 		const char *host, const char *url, const char *query_string,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
-		int expected_count, gpointer data);
+		int expected_count, gint max_count, gpointer data);
+
+#define twitter_send_request_multipage_all(account, host, url, query_string, \
+		success_callback, error_callback, expected_count, data) \
+	twitter_send_request_multipage_all_max_count(account, host, url, query_string, \
+		success_callback, error_callback, expected_count, -1, data);
 
 /* statuses/friends API deprecated page based retrieval,
  * and use cursor based method instead */
@@ -72,3 +96,5 @@ void twitter_send_request_with_cursor (PurpleAccount *account,
        TwitterSendRequestMultiPageAllSuccessFunc success_callback,
        TwitterSendRequestMultiPageAllErrorFunc error_callback,
        gpointer data);
+
+#endif

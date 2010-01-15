@@ -4,8 +4,7 @@
 
 all: build 
 
-IS_PIDGIN = $(shell pkg-config --atleast-version=2.0 pidgin && echo 1 || echo 0)
-
+IS_PIDGIN=0
 include global.mak
 
 SUBDIRS = data
@@ -36,7 +35,7 @@ LIBS =	-lgtk-win32-2.0 \
 			-lpidgin
 CFLAGS := $(PURPLE_CFLAGS) $(TWITTER_INC_PATHS)
 else
-CFLAGS := $(PURPLE_CFLAGS) $(PIDGIN_CFLAGS)
+CFLAGS := $(PURPLE_CFLAGS) $(PIDGIN_CFLAGS) -D_HAZE_=1
 LIB_PATHS = 
 LIBS = $(PIDGIN_LIBS)
 endif
