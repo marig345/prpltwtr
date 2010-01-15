@@ -34,6 +34,7 @@ typedef struct
 
 typedef struct
 {
+	char *screen_name;
 	TwitterTweet *status;
 	TwitterUserData *user;
 } TwitterUserTweet;

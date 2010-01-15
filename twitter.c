@@ -286,12 +286,13 @@ static void twitter_buddy_datas_set_all(PurpleAccount *account, GList *buddy_dat
 		TwitterUserTweet *data = l->data;
 		TwitterUserData *user = data->user;
 		TwitterTweet *status = data->status;
-		char *screen_name = g_strdup(user->screen_name);
+		char *screen_name = data->screen_name;
 
 		g_free(data);
 
-		twitter_buddy_set_user_data(account, user, TRUE);
-		if (status != NULL)
+		if (user)
+			twitter_buddy_set_user_data(account, user, TRUE);
+		if (status)
 			twitter_buddy_set_status_data(account, screen_name, status);
 
 		g_free(screen_name);
@@ -330,13 +331,13 @@ static void _process_replies (PurpleAccount *account,
 		TwitterUserTweet *data = l->data;
 		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
+		char *screen_name = data->screen_name;
 		g_free(data);
 
 		if (!user_data)
 		{
 			twitter_status_data_free(status);
 		} else {
-			char *screen_name = g_strdup(user_data->screen_name);
 			twitter_buddy_set_user_data(account, user_data, FALSE);
 			twitter_status_data_update_conv(ctx, screen_name, status);
 			twitter_buddy_set_status_data(account, screen_name, status);
@@ -345,8 +346,8 @@ static void _process_replies (PurpleAccount *account,
 			gchar *reply_id = g_strdup_printf ("%lld", status->id);
 			g_hash_table_insert (twitter->user_reply_id_table,
 					g_strdup (screen_name), reply_id);
-			g_free(screen_name);
 		}
+		g_free(screen_name);
 	}
 
 	twitter->failed_get_replies_count = 0;
@@ -364,20 +365,17 @@ static void _process_dms(PurpleAccount *account,
 		TwitterUserTweet *data = l->data;
 		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
-		g_free(data);
+		char *screen_name = data->screen_name;
 
 		if (!user_data)
 		{
 			twitter_status_data_free(status);
 		} else {
-			char *screen_name = g_strdup(user_data->screen_name);
-
 			twitter_buddy_set_user_data(account, user_data, FALSE);
 			twitter_status_data_update_conv(ctx, screen_name, status);
 			twitter_status_data_free(status);
-
-			g_free(screen_name);
 		}
+		g_free(screen_name);
 	}
 }
 
@@ -1364,6 +1362,7 @@ static void twitter_remove_buddy(PurpleConnection *gc, PurpleBuddy *buddy,
 		return;
 	twitter_user_data_free(twitter_buddy_data->user);
 	twitter_status_data_free(twitter_buddy_data->status);
+	g_free(twitter_buddy_data->screen_name);
 	g_free(twitter_buddy_data);
 	buddy->proto_data = NULL;
 }

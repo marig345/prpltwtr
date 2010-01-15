@@ -150,16 +150,26 @@ TwitterTweet *twitter_dm_node_parse(xmlnode *dm_node)
 	return twitter_status_node_parse(dm_node);
 }
 
+static TwitterUserTweet *twitter_user_tweet_new(const char *screen_name, TwitterUserData *user, TwitterTweet *tweet)
+{
+	TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
+
+	data->user = user;
+	data->status = tweet;
+	data->screen_name = g_strdup(screen_name);
+	
+	return data;
+}
+
 GList *twitter_dms_node_parse(xmlnode *dms_node)
 {
 	GList *dms = NULL;
 	xmlnode *dm_node;
 	for (dm_node = xmlnode_get_child(dms_node, "direct_message"); dm_node; dm_node = xmlnode_get_next_twin(dm_node))
 	{
-		TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
-
-		data->user = twitter_user_node_parse(xmlnode_get_child(dm_node, "sender"));
-		data->status = twitter_dm_node_parse(dm_node);
+		TwitterUserData *user = twitter_user_node_parse(xmlnode_get_child(dm_node, "sender"));
+		TwitterTweet *tweet = twitter_dm_node_parse(dm_node);
+		TwitterUserTweet *data = twitter_user_tweet_new(user->screen_name, user, tweet);
 
 		dms = g_list_prepend(dms, data);
 
@@ -187,12 +197,9 @@ GList *twitter_users_node_parse(xmlnode *users_node)
 	{
 		if (user_node->name && !strcmp(user_node->name, "user"))
 		{
-			TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
-
-			xmlnode *status_node = xmlnode_get_child(user_node, "status");
-
-			data->user = twitter_user_node_parse(user_node);
-			data->status = twitter_status_node_parse(status_node);
+			TwitterUserData *user = twitter_user_node_parse(user_node);
+			TwitterTweet *tweet = twitter_dm_node_parse(xmlnode_get_child(user_node, "status"));
+			TwitterUserTweet *data = twitter_user_tweet_new(user->screen_name, user, tweet);
 
 			users = g_list_append(users, data);
 		}
@@ -220,10 +227,10 @@ GList *twitter_statuses_node_parse(xmlnode *statuses_node)
 	{
 		if (status_node->name && !strcmp(status_node->name, "status"))
 		{
-			TwitterUserTweet *data = g_new0(TwitterUserTweet, 1);
-			xmlnode *user_node = xmlnode_get_child(status_node, "user");
-			data->user = twitter_user_node_parse(user_node);
-			data->status = twitter_status_node_parse(status_node);
+			TwitterUserData *user = twitter_user_node_parse(xmlnode_get_child(status_node, "user"));
+			TwitterTweet *tweet = twitter_dm_node_parse(status_node);
+			TwitterUserTweet *data = twitter_user_tweet_new(user->screen_name, user, tweet);
+
 			statuses = g_list_prepend(statuses, data);
 		}
 	}
