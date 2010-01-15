@@ -105,7 +105,7 @@ static void twitter_get_home_timeline_parse_statuses(PurpleAccount *account,
 	for (l = statuses; l; l = l->next)
 	{
 		TwitterBuddyData *data = l->data;
-		TwitterStatusData *status = data->status;
+		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
 		g_free(data);
 

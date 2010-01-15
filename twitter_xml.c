@@ -108,15 +108,15 @@ TwitterUserData *twitter_user_node_parse(xmlnode *user_node)
 
 	return user;
 }
-TwitterStatusData *twitter_status_node_parse(xmlnode *status_node)
+TwitterTweet *twitter_status_node_parse(xmlnode *status_node)
 {
-	TwitterStatusData *status;
+	TwitterTweet *status;
 	char *data;
 
 	if (status_node == NULL)
 		return NULL;
 
-	status = g_new0(TwitterStatusData, 1);
+	status = g_new0(TwitterTweet, 1);
 	status->text = xmlnode_get_child_data(status_node, "text");
 
 	if ((data = xmlnode_get_child_data(status_node, "created_at")))
@@ -145,7 +145,7 @@ TwitterStatusData *twitter_status_node_parse(xmlnode *status_node)
 }
 
 
-TwitterStatusData *twitter_dm_node_parse(xmlnode *dm_node)
+TwitterTweet *twitter_dm_node_parse(xmlnode *dm_node)
 {
 	return twitter_status_node_parse(dm_node);
 }
@@ -259,7 +259,7 @@ void twitter_user_data_free(TwitterUserData *user_data)
 	user_data = NULL;
 }
 
-void twitter_status_data_free(TwitterStatusData *status)
+void twitter_status_data_free(TwitterTweet *status)
 {
 	if (status == NULL)
 		return;

@@ -7,7 +7,7 @@ TwitterBuddyData *twitter_buddy_get_buddy_data(PurpleBuddy *b)
 	return b->proto_data;
 }
 
-void twitter_buddy_set_status_data(PurpleAccount *account, const char *src_user, TwitterStatusData *s)
+void twitter_buddy_set_status_data(PurpleAccount *account, const char *src_user, TwitterTweet *s)
 {
 	PurpleBuddy *b;
 	TwitterBuddyData *buddy_data;

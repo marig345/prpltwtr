@@ -4,7 +4,7 @@
 #include "twitter_prefs.h"
 
 TwitterBuddyData *twitter_buddy_get_buddy_data(PurpleBuddy *b);
-void twitter_buddy_set_status_data(PurpleAccount *account, const char *src_user, TwitterStatusData *s);
+void twitter_buddy_set_status_data(PurpleAccount *account, const char *src_user, TwitterTweet *s);
 TwitterBuddyData *twitter_buddy_get_buddy_data(PurpleBuddy *b);
 PurpleBuddy *twitter_buddy_new(PurpleAccount *account, const char *screenname, const char *alias);
 void twitter_buddy_set_user_data(PurpleAccount *account, TwitterUserData *u, gboolean add_missing_buddy);

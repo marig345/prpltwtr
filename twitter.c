@@ -198,7 +198,7 @@ static char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char 
 
 static void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
 		char *buddy_name,
-		TwitterStatusData *s)
+		TwitterTweet *s)
 {
 	PurpleAccount *account = ctx->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
@@ -285,7 +285,7 @@ static void twitter_buddy_datas_set_all(PurpleAccount *account, GList *buddy_dat
 	{
 		TwitterBuddyData *data = l->data;
 		TwitterUserData *user = data->user;
-		TwitterStatusData *status = data->status;
+		TwitterTweet *status = data->status;
 		char *screen_name = g_strdup(user->screen_name);
 
 		g_free(data);
@@ -328,7 +328,7 @@ static void _process_replies (PurpleAccount *account,
 	for (l = statuses; l; l = l->next)
 	{
 		TwitterBuddyData *data = l->data;
-		TwitterStatusData *status = data->status;
+		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
 		g_free(data);
 
@@ -362,7 +362,7 @@ static void _process_dms(PurpleAccount *account,
 	for (l = statuses; l; l = l->next)
 	{
 		TwitterBuddyData *data = l->data;
-		TwitterStatusData *status = data->status;
+		TwitterTweet *status = data->status;
 		TwitterUserData *user_data = data->user;
 		g_free(data);
 
@@ -925,7 +925,7 @@ static void twitter_get_replies_get_last_since_id_success_cb(PurpleAccount *acco
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 	if (status_node != NULL)
 	{
-		TwitterStatusData *status_data = twitter_status_node_parse(status_node);
+		TwitterTweet *status_data = twitter_status_node_parse(status_node);
 		if (status_data != NULL)
 		{
 			id = status_data->id;
@@ -969,7 +969,7 @@ static void twitter_get_dms_get_last_since_id_success_cb(PurpleAccount *account,
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 	if (status_node != NULL)
 	{
-		TwitterStatusData *status_data = twitter_dm_node_parse(status_node);
+		TwitterTweet *status_data = twitter_dm_node_parse(status_node);
 		if (status_data != NULL)
 		{
 			id = status_data->id;
@@ -1152,7 +1152,7 @@ static void twitter_send_im_cb(PurpleAccount *account, xmlnode *node, gpointer u
 	//TODO: verify status was sent
 	return;
 	/*
-	   TwitterStatusData *s = twitter_status_node_parse(node);
+	   TwitterTweet *s = twitter_status_node_parse(node);
 	   xmlnode *user_node = xmlnode_get_child(node, "user");
 	   TwitterUserData *u = twitter_user_node_parse(user_node);
 
@@ -1276,7 +1276,7 @@ static void twitter_get_info(PurpleConnection *gc, const char *username) {
 		if (data)
 		{
 			TwitterUserData *user_data = data->user;
-			TwitterStatusData *status_data = data->status;
+			TwitterTweet *status_data = data->status;
 
 
 			if (user_data)
