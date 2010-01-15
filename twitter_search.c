@@ -15,6 +15,7 @@
 #include "twitter_prefs.h"
 #include "twitter_util.h"
 #include "twitter_search.h"
+#include "twitter_request.h"
 
 typedef struct {
 	PurpleAccount *account;
@@ -89,58 +90,47 @@ static gint _twitter_search_results_sort(gconstpointer _a, gconstpointer _b)
 		return 0;
 }
 
-static void twitter_send_search_cb (PurpleUtilFetchUrlData *url_data,
-		gpointer user_data, const gchar *url_text,
-		gsize len, const gchar *error_message)
+static void twitter_send_search_success_cb(PurpleAccount *acct, xmlnode *response_node, gpointer user_data)
 {
 	TwitterSearchContext *ctx = user_data;
 	GArray *search_results = NULL;
 	const gchar *refresh_url = NULL;
 	long long max_id = 0; /* id of last search result */
-	xmlnode *response_node = NULL;
+	xmlnode *entry_node;
+	xmlnode *link_node;
+	const gchar *ptr;
 
-	response_node = xmlnode_from_str(url_text, len);
-	if (response_node == NULL) {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "error parsing search results");
-		// error
-	}
-	else {
-		xmlnode *entry_node;
-		xmlnode *link_node;
-		const gchar *ptr;
+	search_results = g_array_new (FALSE, FALSE, sizeof (TwitterUserTweet *));
 
-		search_results = g_array_new (FALSE, FALSE, sizeof (TwitterUserTweet *));
-
-		for (link_node = xmlnode_get_child(response_node, "link"); link_node; link_node = xmlnode_get_next_twin(link_node))
+	for (link_node = xmlnode_get_child(response_node, "link"); link_node; link_node = xmlnode_get_next_twin(link_node))
+	{
+		const char *rel = xmlnode_get_attrib(link_node, "rel");
+		if (rel != NULL && !strcmp(rel, "refresh"))
 		{
-			const char *rel = xmlnode_get_attrib(link_node, "rel");
-			if (rel != NULL && !strcmp(rel, "refresh"))
+			const char *refresh_url_full = xmlnode_get_attrib(link_node, "href");
+			ptr = strstr(refresh_url_full, "?");
+			if (ptr != NULL)
 			{
-				const char *refresh_url_full = xmlnode_get_attrib(link_node, "href");
-				ptr = strstr(refresh_url_full, "?");
-				if (ptr != NULL)
-				{
-					refresh_url = ptr;
-					break;
-				}
+				refresh_url = ptr;
+				break;
 			}
 		}
-		for (entry_node = xmlnode_get_child(response_node, "entry"); entry_node; entry_node = xmlnode_get_next_twin(entry_node))
-		{
-			TwitterUserTweet *entry = twitter_search_entry_node_parse(entry_node);
-			if (entry != NULL)
-			{
-				g_array_append_val(search_results, entry);
-				if (max_id < entry->status->id)
-					max_id = entry->status->id;
-			}
-		}
-
-		g_array_sort(search_results, _twitter_search_results_sort);
-
-		purple_debug_info(TWITTER_PROTOCOL_ID, "refresh_url: %s, max_id: %lld\n",
-				refresh_url, max_id);
 	}
+	for (entry_node = xmlnode_get_child(response_node, "entry"); entry_node; entry_node = xmlnode_get_next_twin(entry_node))
+	{
+		TwitterUserTweet *entry = twitter_search_entry_node_parse(entry_node);
+		if (entry != NULL)
+		{
+			g_array_append_val(search_results, entry);
+			if (max_id < entry->status->id)
+				max_id = entry->status->id;
+		}
+	}
+
+	g_array_sort(search_results, _twitter_search_results_sort);
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "refresh_url: %s, max_id: %lld\n",
+			refresh_url, max_id);
 
 	ctx->success_func (ctx->account, search_results,
 			refresh_url, max_id, ctx->user_data);
@@ -155,26 +145,14 @@ void twitter_search (PurpleAccount *account, const char *query,
 {
 	/* by default "search.twitter.com" */
 	const char *search_host_url = twitter_option_host_search_url(account);
-	gchar *full_url = g_strdup_printf ("http://%s/search.atom", search_host_url);
-
-	gchar *request = g_strdup_printf (
-			"GET %s%s HTTP/1.0\r\n"
-			"User-Agent: Mozilla/4.0 (compatible; MSIE 5.5)\r\n"
-			"Host: %s\r\n\r\n",
-			full_url,
-			query,
-			search_host_url);
-
 	TwitterSearchContext *ctx = g_slice_new0 (TwitterSearchContext);
 	ctx->account = account;
 	ctx->user_data = data;
 	ctx->success_func = success_cb;
 	ctx->error_func = error_cb;
+	twitter_send_request(account, FALSE,
+			search_host_url, "/search.atom", query,
+			twitter_send_search_success_cb, NULL, //TODO error
+			ctx);
 
-	purple_util_fetch_url_request (full_url, TRUE,
-			"Mozilla/4.0 (compatible; MSIE 5.5)", TRUE, request, FALSE,
-			twitter_send_search_cb, ctx);
-
-	g_free (full_url);
-	g_free (request);
 }
