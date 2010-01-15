@@ -43,6 +43,71 @@ static void twitter_timeline_timeout_context_free(gpointer _ctx)
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
 
+typedef struct
+{
+	gchar *message;
+	gchar *pos;
+	gint len;
+	gchar *add_text;
+} SendImContext;
+
+
+static void twitter_send_im_split_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+{
+	/*TwitterTweet *s = twitter_status_node_parse(node);
+	if (!s)
+		return;
+
+	if (s && u)
+	{
+	}*/
+}
+
+static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx)
+{
+	char *status;
+	int max_len;
+	ctx->pos += ctx->len;
+
+	if (ctx->pos[0] == '\0')
+		return;
+
+	while (ctx->pos[0] == ' ')
+		ctx->pos++;
+
+	max_len = ctx->add_text ? MAX_TWEET_LENGTH - strlen(ctx->add_text) + 1 : MAX_TWEET_LENGTH;
+
+	//add add_text
+	if (strlen(ctx->pos) <= max_len)
+	{
+		status = g_strdup(ctx->pos);
+	} else {
+		gchar *space = g_strrstr_len(ctx->pos, max_len, " ");
+		int len = (space ? space - ctx->pos : max_len);
+		status = g_strndup(ctx->pos, len);
+	}
+	twitter_api_set_status(purple_connection_get_account(gc),
+			status,
+			0,
+			twitter_send_im_split_cb,
+			NULL,
+			ctx);
+	g_strdup(status);
+}
+
+static int twitter_send_im_split(PurpleConnection *gc, const char *message,
+		const char *add_text)
+{
+	SendImContext *ctx = g_new0(SendImContext, 1);
+	ctx->message = g_strdup(message);
+	ctx->pos = ctx->message;
+	ctx->len = 0;
+	ctx->add_text = g_strdup(add_text);
+	twitter_send_im_split_do(gc, ctx);
+	return 1;
+}
+
+
 //TODO merge me
 static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar *message)
 {
