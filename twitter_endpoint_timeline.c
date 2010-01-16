@@ -61,28 +61,67 @@ static void twitter_send_im_split_cb(PurpleAccount *account, xmlnode *node, gpoi
 
 static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx)
 {
+	int index_add_text = -1;
 	char *status;
-	int max_len;
+	int len_left;
+	int len = 0;
 	ctx->pos += ctx->len;
-
-	if (ctx->pos[0] == '\0')
-		return;
 
 	while (ctx->pos[0] == ' ')
 		ctx->pos++;
 
-	max_len = ctx->add_text ? MAX_TWEET_LENGTH - strlen(ctx->add_text) + 1 : MAX_TWEET_LENGTH;
+	if (ctx->pos[0] == '\0')
+		return;
+
+	//TODO: proper case sensitivity
+	if (ctx->add_text)
+	{
+		char *pnt_add_text = strstr(ctx->pos, ctx->add_text);
+		if (pnt_add_text)
+			index_add_text = pnt_add_text - ctx->pos + strlen(ctx->add_text);
+	}
 
 	//add add_text
-	if (strlen(ctx->pos) <= max_len)
+	len_left = strlen(ctx->pos);
+	if (len_left <= MAX_TWEET_LENGTH && (!ctx->add_text || index_add_text != -1))
 	{
 		status = g_strdup(ctx->pos);
+		len = strlen(ctx->pos);
+	} else if (len_left <= MAX_TWEET_LENGTH && len_left + strlen(ctx->add_text) + 1 <= MAX_TWEET_LENGTH) {
+		status = g_strdup_printf("%s %s", ctx->add_text, ctx->pos);
+		len = strlen(ctx->pos);
 	} else {
-		gchar *space = g_strrstr_len(ctx->pos, max_len, " ");
-		int len = (space ? space - ctx->pos : max_len);
-		status = g_strndup(ctx->pos, len);
+		gchar *space;
+		if (ctx->add_text 
+			&& index_add_text != -1
+			&& index_add_text <= MAX_TWEET_LENGTH
+			&& (space = g_strrstr_len(ctx->pos + index_add_text, MAX_TWEET_LENGTH - index_add_text, " "))
+			&& (space - ctx->pos <= MAX_TWEET_LENGTH))
+		{
+			//split already has our word in it
+			len = space - ctx->pos;
+			status = g_strndup(ctx->pos, len);
+		} else if ((space = g_strrstr_len(ctx->pos, MAX_TWEET_LENGTH - (ctx->add_text ? strlen(ctx->add_text) + 1 : 0), " "))) {
+			len = space - ctx->pos;
+			space[0] = '\0';
+			status = ctx->add_text ? g_strdup_printf("%s %s", ctx->add_text, ctx->pos) : g_strdup(ctx->pos);
+			space[0] = ' ';
+		} else if (index_add_text != -1 && index_add_text <= MAX_TWEET_LENGTH) {
+			len = MAX_TWEET_LENGTH;
+			status = g_strndup(ctx->pos, len);
+		} else {
+			char prev_char;
+			len = MAX_TWEET_LENGTH - (ctx->add_text ? strlen(ctx->add_text) + 1 : 0);
+			prev_char = ctx->pos[len];
+			ctx->pos[len] = '\0';
+			status = ctx->add_text ? g_strdup_printf("%s %s", ctx->add_text, ctx->pos) : g_strdup(ctx->pos);
+			ctx->pos[len] = prev_char;
+		}
 	}
-	ctx->len += strlen(status);
+	ctx->len = len;
+	//debug
+	//printf("Status: (%s) (%d)\n", status, strlen(status));
+	//twitter_send_im_split_cb(purple_connection_get_account(gc), NULL, ctx);
 	twitter_api_set_status(purple_connection_get_account(gc),
 			status,
 			0,
@@ -99,11 +138,11 @@ static int twitter_send_im_split(PurpleConnection *gc, const char *message,
 	ctx->message = g_strdup(message);
 	ctx->pos = ctx->message;
 	ctx->len = 0;
-	ctx->add_text = g_strdup(add_text);
+	if (add_text)
+		ctx->add_text = g_strdup(add_text);
 	twitter_send_im_split_do(gc, ctx);
 	return 1;
 }
-
 
 //TODO merge me
 static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar *message)
