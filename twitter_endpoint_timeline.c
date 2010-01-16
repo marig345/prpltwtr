@@ -52,15 +52,11 @@ typedef struct
 } SendImContext;
 
 
+static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx);
 static void twitter_send_im_split_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
 {
-	/*TwitterTweet *s = twitter_status_node_parse(node);
-	if (!s)
-		return;
-
-	if (s && u)
-	{
-	}*/
+	SendImContext *ctx = user_data;
+	twitter_send_im_split_do(purple_account_get_connection(account), ctx);
 }
 
 static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx)
@@ -86,6 +82,7 @@ static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx)
 		int len = (space ? space - ctx->pos : max_len);
 		status = g_strndup(ctx->pos, len);
 	}
+	ctx->len += strlen(status);
 	twitter_api_set_status(purple_connection_get_account(gc),
 			status,
 			0,
@@ -116,25 +113,11 @@ static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar
 
 	if (conv == NULL) return -1; //TODO: error?
 
-	if (strlen(message) > MAX_TWEET_LENGTH)
-	{
-		//TODO: SHOW ERROR
-		return -E2BIG;
-	}
-	else
-	{
-		twitter_api_set_status(account,
-				message, 0,
-				NULL, NULL,//TODO: verify & error
-				NULL);
-#if _HAZE_
-		//It's already in the message box in haze. Maybe we should edit it before hand?
-		//twitter_chat_add_tweet(PURPLE_CONV_IM(conv), account->username, message, 0, time(NULL));//TODO: FIX TIME
-#else
-		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, message, 0, time(NULL));//TODO: FIX TIME
+	twitter_send_im_split(purple_account_get_connection(account), message, NULL);
+#if !_HAZE_
+	twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, message, 0, time(NULL));
 #endif
-		return 0;
-	}
+	return 0;
 }
 
 static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
