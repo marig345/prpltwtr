@@ -43,146 +43,45 @@ static void twitter_timeline_timeout_context_free(gpointer _ctx)
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
 
-typedef struct
+static void twitter_chat_timeline_send_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx)
 {
-	gchar *message;
-	gchar *pos;
-	gint len;
-	gchar *add_text;
-} SendImContext;
+	TwitterEndpointChat *ctx = _ctx;
+	TwitterTweet *tweet = twitter_status_node_parse(node);
+	PurpleConversation *conv;
 
-
-static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx);
-static void twitter_send_im_split_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
-{
-	SendImContext *ctx = user_data;
-	twitter_send_im_split_do(purple_account_get_connection(account), ctx);
-}
-
-static gchar *twitter_utf8_find_last_pos(gchar *str, gchar *needles, glong str_len)
-{
-	gchar *last;
-	gchar *needle;
-	for (last = g_utf8_offset_to_pointer(str, str_len); last; last = g_utf8_find_prev_char(str, last))
-		for (needle = needles; *needle; needle++)
-			if (*last == *needle)
-			{
-				return last;
-			}
-	return NULL;
-}
-
-static void twitter_send_im_split_do(PurpleConnection *gc, SendImContext *ctx)
-{
-	int add_text_len = 0;
-	int index_add_text = -1;
-	char *status;
-	int len_left;
-	int len = 0;
-	ctx->pos += ctx->len;
-
-	while (ctx->pos[0] == ' ')
-		ctx->pos++;
-
-	if (ctx->pos[0] == '\0')
-		return;
-
-	//TODO: proper case sensitivity
-	if (ctx->add_text)
+#if !_HAZE_
+	if (tweet && tweet->text && (conv = twitter_endpoint_chat_find_open_conv(ctx)))
 	{
-		char *pnt_add_text = strstr(ctx->pos, ctx->add_text);
-		add_text_len = g_utf8_strlen(ctx->add_text, -1);
-		if (pnt_add_text)
-			index_add_text = g_utf8_pointer_to_offset(ctx->pos, pnt_add_text) + add_text_len;
+		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, tweet->text, 0, tweet->created_at);
+	}
+#endif
+}
+static gboolean twitter_chat_timeline_send_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _ctx)
+{
+	TwitterEndpointChat *ctx = _ctx;
+	PurpleConversation *conv = twitter_endpoint_chat_find_open_conv(ctx);
+
+	if (conv)
+	{
+		purple_conversation_write(conv, NULL, "Error sending tweet", PURPLE_MESSAGE_ERROR, time(NULL));
 	}
 
-	//add add_text
-	len_left = g_utf8_strlen(ctx->pos, -1);
-	if (len_left <= MAX_TWEET_LENGTH && (!ctx->add_text || index_add_text != -1))
-	{
-		status = g_strdup(ctx->pos);
-		len = strlen(ctx->pos);
-	} else if (len_left <= MAX_TWEET_LENGTH && len_left + add_text_len + 1 <= MAX_TWEET_LENGTH) {
-		status = g_strdup_printf("%s %s", ctx->add_text, ctx->pos);
-		len = strlen(ctx->pos);
-	} else {
-		gchar *space;
-		if (ctx->add_text 
-			&& index_add_text != -1
-			&& index_add_text <= MAX_TWEET_LENGTH
-			&& (space = twitter_utf8_find_last_pos(ctx->pos + index_add_text, " ", MAX_TWEET_LENGTH - g_utf8_pointer_to_offset(ctx->pos, ctx->pos + index_add_text)))
-			&& (g_utf8_pointer_to_offset(ctx->pos, space) <= MAX_TWEET_LENGTH))
-		{
-			//split already has our word in it
-			len = space - ctx->pos;
-			status = g_strndup(ctx->pos, len);
-		} else if ((space = twitter_utf8_find_last_pos(ctx->pos, " ", MAX_TWEET_LENGTH - (ctx->add_text ? add_text_len + 1 : 0)))) {
-			len = space - ctx->pos;
-			space[0] = '\0';
-			status = ctx->add_text ? g_strdup_printf("%s %s", ctx->add_text, ctx->pos) : g_strdup(ctx->pos);
-			space[0] = ' ';
-		} else if (index_add_text != -1 && index_add_text <= MAX_TWEET_LENGTH) {
-			//one long word, which contains our add_text
-			char prev_char;
-			gchar *end_pos;
-			end_pos = g_utf8_offset_to_pointer(ctx->pos, MAX_TWEET_LENGTH);
-			len = end_pos - ctx->pos;
-			prev_char = end_pos[0];
-			end_pos[0] = '\0';
-			status = g_strdup(ctx->pos);
-			end_pos[0] = prev_char;
-		} else {
-			char prev_char;
-			gchar *end_pos;
-			end_pos = (index_add_text != -1 && index_add_text <= MAX_TWEET_LENGTH ?
-					g_utf8_offset_to_pointer(ctx->pos, MAX_TWEET_LENGTH) :
-					g_utf8_offset_to_pointer(ctx->pos, MAX_TWEET_LENGTH - (ctx->add_text ? add_text_len + 1 : 0)));
-			end_pos = g_utf8_offset_to_pointer(ctx->pos, MAX_TWEET_LENGTH - (ctx->add_text ? add_text_len + 1 : 0));
-			len = end_pos - ctx->pos;
-			prev_char = end_pos[0];
-			end_pos[0] = '\0';
-			status = ctx->add_text ? g_strdup_printf("%s %s", ctx->add_text, ctx->pos) : g_strdup(ctx->pos);
-			end_pos[0] = prev_char;
-		}
-	}
-	ctx->len = len;
-	//debug
-	//printf("Status: (%s) (%d)\n", status, g_utf8_strlen(status, -1));
-	//twitter_send_im_split_cb(purple_connection_get_account(gc), NULL, ctx);
-	twitter_api_set_status(purple_connection_get_account(gc),
-			status,
-			0,
-			twitter_send_im_split_cb,
-			NULL,
-			ctx);
-	g_strdup(status);
-}
-
-static int twitter_send_im_split(PurpleConnection *gc, const char *message,
-		const char *add_text)
-{
-	SendImContext *ctx = g_new0(SendImContext, 1);
-	ctx->message = g_strdup(message);
-	ctx->pos = ctx->message;
-	ctx->len = 0;
-	if (add_text)
-		ctx->add_text = g_strdup(add_text);
-	twitter_send_im_split_do(gc, ctx);
-	return 1;
+	return FALSE; //give up trying
 }
 
 //TODO merge me
 static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar *message)
 {
 	PurpleAccount *account = ctx_base->account;
-	PurpleConversation *conv = twitter_endpoint_chat_find_open_conv(ctx_base);
 
-	if (conv == NULL) return -1; //TODO: error?
+	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, NULL);;
+	twitter_api_set_statuses(account,
+			statuses,
+			0,
+			twitter_chat_timeline_send_success_cb,
+			twitter_chat_timeline_send_error_cb,
+			ctx_base);
 
-	twitter_send_im_split(purple_account_get_connection(account), message, "不不不不不不不不不不不");
-#if !_HAZE_
-	twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, message, 0, time(NULL));
-#endif
 	return 0;
 }
 

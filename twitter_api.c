@@ -214,6 +214,84 @@ void twitter_api_set_status(PurpleAccount *account,
 	}
 }
 
+typedef struct
+{
+	GArray *statuses;
+	long long in_reply_to_status_id;
+	TwitterSendRequestSuccessFunc success_func;
+	TwitterSendRequestMultiPageErrorFunc error_func;
+	gpointer user_data;
+	int statuses_index;
+} TwitterSetStatusesContext;
+
+static void twitter_api_set_statuses_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx);
+static void twitter_api_set_statuses_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer _ctx)
+{
+	TwitterSetStatusesContext *ctx = _ctx;
+
+	if (ctx->error_func && !ctx->error_func(account, error_data, ctx->user_data))
+	{
+		//TODO: verify this doesn't leak
+		g_array_free(ctx->statuses, TRUE);
+		g_free(ctx);
+		return;
+	}
+	//Try again
+	twitter_api_set_status(account,
+			g_array_index(ctx->statuses, gchar*, ctx->statuses_index),
+			ctx->in_reply_to_status_id,
+			twitter_api_set_statuses_success_cb,
+			twitter_api_set_statuses_error_cb,
+			ctx);
+}
+
+static void twitter_api_set_statuses_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx)
+{
+	TwitterSetStatusesContext *ctx = _ctx;
+
+	if (ctx->success_func)
+		ctx->success_func(account, node, ctx->user_data);
+
+	if (++ctx->statuses_index >= ctx->statuses->len)
+	{
+		//TODO: verify this doesn't leak
+		g_array_free(ctx->statuses, TRUE);
+		g_free(ctx);
+		return;
+	}
+	twitter_api_set_status(account,
+			g_array_index(ctx->statuses, gchar*, ctx->statuses_index),
+			ctx->in_reply_to_status_id,
+			twitter_api_set_statuses_success_cb,
+			twitter_api_set_statuses_error_cb,
+			ctx);
+}
+
+void twitter_api_set_statuses(PurpleAccount *account,
+		GArray *statuses,
+		long long in_reply_to_status_id,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestMultiPageErrorFunc error_func,
+		gpointer data)
+{
+	TwitterSetStatusesContext *ctx;
+	g_return_if_fail(statuses && statuses->len);
+	ctx = g_new0(TwitterSetStatusesContext, 1);
+	ctx->statuses = statuses;
+	ctx->in_reply_to_status_id = in_reply_to_status_id;
+	ctx->success_func = success_func;
+	ctx->error_func = error_func;
+	ctx->user_data = data;
+	ctx->statuses_index = 0;
+
+	twitter_api_set_status(account,
+			g_array_index(statuses, gchar*, 0),
+			in_reply_to_status_id,
+			twitter_api_set_statuses_success_cb,
+			NULL,
+			ctx);
+}
+
 void twitter_api_send_dm(PurpleAccount *account,
 		const char *user,
 		const char *msg,
