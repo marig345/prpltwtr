@@ -43,48 +43,6 @@ static void twitter_timeline_timeout_context_free(gpointer _ctx)
 	g_slice_free (TwitterTimelineTimeoutContext, ctx);
 } 
 
-static void twitter_chat_timeline_send_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx)
-{
-	TwitterEndpointChat *ctx = _ctx;
-	TwitterTweet *tweet = twitter_status_node_parse(node);
-	PurpleConversation *conv;
-
-#if !_HAZE_
-	if (tweet && tweet->text && (conv = twitter_endpoint_chat_find_open_conv(ctx)))
-	{
-		twitter_chat_add_tweet(PURPLE_CONV_CHAT(conv), account->username, tweet->text, 0, tweet->created_at);
-	}
-#endif
-}
-static gboolean twitter_chat_timeline_send_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _ctx)
-{
-	TwitterEndpointChat *ctx = _ctx;
-	PurpleConversation *conv = twitter_endpoint_chat_find_open_conv(ctx);
-
-	if (conv)
-	{
-		purple_conversation_write(conv, NULL, "Error sending tweet", PURPLE_MESSAGE_ERROR, time(NULL));
-	}
-
-	return FALSE; //give up trying
-}
-
-//TODO merge me
-static int twitter_chat_timeline_send(TwitterEndpointChat *ctx_base, const gchar *message)
-{
-	PurpleAccount *account = ctx_base->account;
-
-	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, NULL);;
-	twitter_api_set_statuses(account,
-			statuses,
-			0,
-			twitter_chat_timeline_send_success_cb,
-			twitter_chat_timeline_send_error_cb,
-			ctx_base);
-
-	return 0;
-}
-
 static char *twitter_chat_name_from_timeline_id(const gint timeline_id)
 {
 	return g_strdup("Timeline: Home");
@@ -248,7 +206,7 @@ static TwitterEndpointChatSettings TwitterEndpointTimelineSettings =
 #if _HAZE_
 	'!',
 #endif
-	twitter_chat_timeline_send, //send_message
+	NULL,
 	twitter_timeline_timeout_context_free, //endpoint_data_free
 	twitter_option_timeline_timeout, //get_default_interval
 	twitter_timeline_chat_name_from_components, //get_name

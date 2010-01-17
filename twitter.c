@@ -504,9 +504,7 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 
 	g_return_val_if_fail(ctx != NULL, -1);
 
-	if (ctx->settings && ctx->settings->send_message)
-		return ctx->settings->send_message(ctx, message);
-	return -1;
+	return twitter_endpoint_chat_send(ctx, message);
 }
 
 
