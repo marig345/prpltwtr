@@ -215,13 +215,13 @@ GArray *twitter_utf8_get_segments(const gchar *message, int segment_length, cons
 	GArray *segments;
 	const gchar *new_start = NULL;
 	const gchar *pos;
-	gchar *segment = twitter_utf8_get_segment(message, MAX_TWEET_LENGTH, add_text, &new_start);
+	gchar *segment = twitter_utf8_get_segment(message, segment_length, add_text, &new_start);
 	segments = g_array_new(FALSE, FALSE, sizeof(char *));
 	while (segment)
 	{
 		g_array_append_val(segments, segment);
 		pos = new_start;
-		segment = twitter_utf8_get_segment(pos, MAX_TWEET_LENGTH, add_text, &new_start);
+		segment = twitter_utf8_get_segment(pos, segment_length, add_text, &new_start);
 	};
 	return segments;
 }
