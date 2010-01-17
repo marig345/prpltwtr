@@ -407,14 +407,23 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 	gchar *next_cursor_str;
 
 	next_cursor_str = xmlnode_get_child_data (node, "next_cursor");
-	request_data->next_cursor = strtoll (next_cursor_str, NULL, 10);
-	g_free (next_cursor_str);
+	if (next_cursor_str)
+	{
+		request_data->next_cursor = strtoll (next_cursor_str, NULL, 10);
+		g_free (next_cursor_str);
+	} else {
+		request_data->next_cursor = 0;
+	}
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s next_cursor: %lld\n",
 			G_STRFUNC, request_data->next_cursor);
 
 	users = xmlnode_get_child (node, "users");
-	if (users) {
+	if (!users && node->name && !strcmp(node->name, "users"))
+		users = node;
+
+	if (users) 
+	{
 		request_data->nodes = g_list_prepend (request_data->nodes,
 				xmlnode_copy (users));
 	}
