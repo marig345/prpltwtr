@@ -217,17 +217,22 @@ void twitter_api_set_status(PurpleAccount *account,
 typedef struct
 {
 	GArray *statuses;
-	long long in_reply_to_status_id;
 	TwitterSendRequestSuccessFunc success_func;
 	TwitterSendRequestMultiPageErrorFunc error_func;
 	gpointer user_data;
 	int statuses_index;
-} TwitterSetStatusesContext;
+
+	//set status only
+	long long in_reply_to_status_id;
+
+	//dm only
+	gchar *dm_who;
+} TwitterMultiMessageContext;
 
 static void twitter_api_set_statuses_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx);
 static void twitter_api_set_statuses_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer _ctx)
 {
-	TwitterSetStatusesContext *ctx = _ctx;
+	TwitterMultiMessageContext *ctx = _ctx;
 
 	if (ctx->error_func && !ctx->error_func(account, error_data, ctx->user_data))
 	{
@@ -247,7 +252,7 @@ static void twitter_api_set_statuses_error_cb(PurpleAccount *account, const Twit
 
 static void twitter_api_set_statuses_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx)
 {
-	TwitterSetStatusesContext *ctx = _ctx;
+	TwitterMultiMessageContext *ctx = _ctx;
 
 	if (ctx->success_func)
 		ctx->success_func(account, node, ctx->user_data);
@@ -274,9 +279,9 @@ void twitter_api_set_statuses(PurpleAccount *account,
 		TwitterSendRequestMultiPageErrorFunc error_func,
 		gpointer data)
 {
-	TwitterSetStatusesContext *ctx;
+	TwitterMultiMessageContext *ctx;
 	g_return_if_fail(statuses && statuses->len);
-	ctx = g_new0(TwitterSetStatusesContext, 1);
+	ctx = g_new0(TwitterMultiMessageContext, 1);
 	ctx->statuses = statuses;
 	ctx->in_reply_to_status_id = in_reply_to_status_id;
 	ctx->success_func = success_func;
@@ -288,7 +293,7 @@ void twitter_api_set_statuses(PurpleAccount *account,
 			g_array_index(statuses, gchar*, 0),
 			in_reply_to_status_id,
 			twitter_api_set_statuses_success_cb,
-			NULL,
+			twitter_api_set_statuses_error_cb,
 			ctx);
 }
 
@@ -313,6 +318,76 @@ void twitter_api_send_dm(PurpleAccount *account,
 	} else {
 		//SEND error?
 	}
+}
+
+static void twitter_api_send_dms_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx);
+static void twitter_api_send_dms_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer _ctx)
+{
+	TwitterMultiMessageContext *ctx = _ctx;
+
+	if (ctx->error_func && !ctx->error_func(account, error_data, ctx->user_data))
+	{
+		//TODO: verify this doesn't leak
+		g_array_free(ctx->statuses, TRUE);
+		g_free(ctx->dm_who);
+		g_free(ctx);
+		return;
+	}
+	//Try again
+	twitter_api_send_dm(account,
+			ctx->dm_who,
+			g_array_index(ctx->statuses, gchar*, ctx->statuses_index),
+			twitter_api_send_dms_success_cb,
+			twitter_api_send_dms_error_cb,
+			ctx);
+}
+
+static void twitter_api_send_dms_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx)
+{
+	TwitterMultiMessageContext *ctx = _ctx;
+
+	if (ctx->success_func)
+		ctx->success_func(account, node, ctx->user_data);
+
+	if (++ctx->statuses_index >= ctx->statuses->len)
+	{
+		//TODO: verify this doesn't leak
+		g_array_free(ctx->statuses, TRUE);
+		g_free(ctx->dm_who);
+		g_free(ctx);
+		return;
+	}
+	twitter_api_send_dm(account,
+			ctx->dm_who,
+			g_array_index(ctx->statuses, gchar*, ctx->statuses_index),
+			twitter_api_send_dms_success_cb,
+			twitter_api_send_dms_error_cb,
+			ctx);
+}
+
+void twitter_api_send_dms(PurpleAccount *account,
+		const gchar *who,
+		GArray *statuses,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestMultiPageErrorFunc error_func,
+		gpointer data)
+{
+	TwitterMultiMessageContext *ctx;
+	g_return_if_fail(statuses && statuses->len);
+	ctx = g_new0(TwitterMultiMessageContext, 1);
+	ctx->statuses = statuses;
+	ctx->success_func = success_func;
+	ctx->error_func = error_func;
+	ctx->user_data = data;
+	ctx->statuses_index = 0;
+	ctx->dm_who = g_strdup(who);
+
+	twitter_api_send_dm(account,
+			ctx->dm_who,
+			g_array_index(ctx->statuses, gchar*, ctx->statuses_index),
+			twitter_api_send_dms_success_cb,
+			twitter_api_send_dms_error_cb,
+			ctx);
 }
 
 void twitter_api_get_saved_searches (PurpleAccount *account,

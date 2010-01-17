@@ -1091,22 +1091,22 @@ static void twitter_set_status_error_cb(PurpleAccount *acct, const TwitterReques
 			(message));
 }
 
-static void twitter_send_dm_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
-{
-	const char *message;
-	if (error_data->type == TWITTER_REQUEST_ERROR_SERVER || error_data->type == TWITTER_REQUEST_ERROR_TWITTER_GENERAL)
-	{
-		message = error_data->message;
-	} else if (error_data->type == TWITTER_REQUEST_ERROR_INVALID_XML) {
-		message = "Unknown reply by twitter server";
-	} else {
-		message = "Unknown error";
-	}
-	purple_notify_error(NULL,  /* plugin handle or PurpleConnection */
-			("Twitter Send Direct Message"),
-			("Error sending Direct Message"),
-			(message));
-}
+//static void twitter_send_dm_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
+//{
+//	const char *message;
+//	if (error_data->type == TWITTER_REQUEST_ERROR_SERVER || error_data->type == TWITTER_REQUEST_ERROR_TWITTER_GENERAL)
+//	{
+//		message = error_data->message;
+//	} else if (error_data->type == TWITTER_REQUEST_ERROR_INVALID_XML) {
+//		message = "Unknown reply by twitter server";
+//	} else {
+//		message = "Unknown error";
+//	}
+//	purple_notify_error(NULL,  /* plugin handle or PurpleConnection */
+//			("Twitter Send Direct Message"),
+//			("Error sending Direct Message"),
+//			(message));
+//}
 
 static TwitterImType twitter_conv_name_to_type(PurpleAccount *account, const char *name)
 {
@@ -1132,29 +1132,31 @@ static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const
 }
 
 
-static void twitter_send_dm_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+static gboolean twitter_send_dm_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
 {
-	//TODO: verify dm was sent
-	return;
+	//TODO: this doesn't work yet
+	gchar *who = _who;
+	if (who)
+	{
+		purple_conv_present_error(who, account, "Error sending dm");
+	}
+
+	return FALSE; //give up trying
 }
 
 static int twitter_send_dm_do(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
 {
-	if (strlen(message) > MAX_TWEET_LENGTH)
-	{
-		purple_conv_present_error(who, purple_connection_get_account(gc), "Message is too long");
-		return -E2BIG;
-	}
-	else
-	{
-		//TODO handle errors
-		twitter_api_send_dm(purple_connection_get_account(gc),
-				who, message, 
-				twitter_send_dm_cb, twitter_send_dm_error_cb,
-				NULL);
-		return 1;
-	}
+	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, NULL);
+
+	twitter_api_send_dms(purple_connection_get_account(gc),
+			who,
+			statuses,
+			NULL,
+			twitter_send_dm_error_cb,
+			NULL); //TODO
+
+	return 1;
 }
 
 static gboolean twitter_send_im_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)

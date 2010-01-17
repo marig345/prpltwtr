@@ -93,6 +93,13 @@ void twitter_api_set_statuses(PurpleAccount *account,
 		TwitterSendRequestMultiPageErrorFunc error_func,
 		gpointer data);
 
+void twitter_api_send_dms(PurpleAccount *account,
+		const gchar *who,
+		GArray *statuses,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestMultiPageErrorFunc error_func,
+		gpointer data);
+
 void twitter_api_set_status(PurpleAccount *acct,
 		const char *msg,
 		long long in_reply_to_status_id,
