@@ -1137,28 +1137,6 @@ static void twitter_send_dm_cb(PurpleAccount *account, xmlnode *node, gpointer u
 	//TODO: verify dm was sent
 	return;
 }
-static void twitter_send_im_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
-{
-	//TODO: verify status was sent
-	return;
-	/*
-	   TwitterTweet *s = twitter_status_node_parse(node);
-	   xmlnode *user_node = xmlnode_get_child(node, "user");
-	   TwitterUserData *u = twitter_user_node_parse(user_node);
-
-	   if (!s)
-	   return;
-
-	   if (!u)
-	   {
-	   twitter_status_data_free(s);
-	   return;
-	   }
-
-	   twitter_buddy_set_status_data(account, u->screen_name, s, FALSE);
-	   twitter_user_data_free(u);
-	 */
-}
 
 static int twitter_send_dm_do(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
@@ -1179,33 +1157,42 @@ static int twitter_send_dm_do(PurpleConnection *gc, const char *who,
 	}
 }
 
+static gboolean twitter_send_im_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
+{
+	//TODO: this doesn't work yet
+	gchar *who = _who;
+	if (who)
+	{
+		purple_conv_present_error(who, account, "Error sending tweet");
+	}
+
+	return FALSE; //give up trying
+}
+
 static int twitter_send_im_do(PurpleConnection *gc, const char *who,
 		const char *message, PurpleMessageFlags flags)
 {
-	if (strlen(who) + strlen(message) + 2 > MAX_TWEET_LENGTH)
-	{
-		return -E2BIG;
-	}
-	else
-	{
-		TwitterConnectionData *twitter = gc->proto_data;
-		long long in_reply_to_status_id = 0;
-		const gchar *reply_id;
-		char *status;
+	TwitterConnectionData *twitter = gc->proto_data;
+	gchar *added_text = g_strdup_printf("@%s", who);
+	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, added_text);
+	long long in_reply_to_status_id = 0;
+	const gchar *reply_id;
 
-		status = g_strdup_printf("@%s %s", who, message);
-		reply_id = (const gchar *)g_hash_table_lookup (
-				twitter->user_reply_id_table, who);
-		if (reply_id)
-			in_reply_to_status_id = strtoll (reply_id, NULL, 10);
+	reply_id = (const gchar *)g_hash_table_lookup (
+			twitter->user_reply_id_table, who);
+	if (reply_id)
+		in_reply_to_status_id = strtoll (reply_id, NULL, 10);
 
-		//TODO handle errors
-		twitter_api_set_status(purple_connection_get_account(gc),
-				status, in_reply_to_status_id, twitter_send_im_cb,
-				twitter_set_status_error_cb, NULL);
-		g_free(status);
-		return 1;
-	}
+	twitter_api_set_statuses(purple_connection_get_account(gc),
+			statuses,
+			in_reply_to_status_id,
+			NULL,
+			twitter_send_im_error_cb,
+			NULL); //TODO
+
+	g_free(added_text);
+
+	return 1;
 }
 
 /* A few options here
@@ -1238,6 +1225,7 @@ static int twitter_send_im(PurpleConnection *gc, const char *conv_name,
 	}
 #endif
 
+	//TODO, this should be part of im settings
 	im_type = twitter_conv_name_to_type(account, conv_name);
 	buddy_name = twitter_conv_name_to_buddy_name(account, conv_name);
 	if (im_type == TWITTER_IM_TYPE_DM)
