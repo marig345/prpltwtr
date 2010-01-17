@@ -139,7 +139,7 @@ char *twitter_utf8_get_segment(const gchar *message, int max_len, const gchar *a
 	char *status;
 	int len_left;
 	int len = 0;
-	static const gchar *spaces = " ";
+	static const gchar *spaces = " \r\n";
 
 	while (message[0] == ' ')
 		message++;

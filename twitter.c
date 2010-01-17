@@ -501,10 +501,16 @@ static int twitter_chat_send(PurpleConnection *gc, int id, const char *message,
 	PurpleConversation *conv = purple_find_chat(gc, id);
 	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterEndpointChat *ctx = (TwitterEndpointChat *) g_hash_table_lookup(twitter->chat_contexts, purple_conversation_get_name(conv));
+	char *stripped_message;
+	int rv;
 
 	g_return_val_if_fail(ctx != NULL, -1);
 
-	return twitter_endpoint_chat_send(ctx, message);
+	stripped_message = purple_markup_strip_html(message);
+
+	rv = twitter_endpoint_chat_send(ctx, stripped_message);
+	g_free(stripped_message);
+	return rv;
 }
 
 
@@ -1226,20 +1232,29 @@ static int twitter_send_im(PurpleConnection *gc, const char *conv_name,
 	TwitterImType im_type;
 	const char *buddy_name;
 	PurpleAccount *account = purple_connection_get_account(gc);
-	/* TODO should truncate it rather than drop it????? */
+	char *stripped_message;
+	int rv = 0;
+
 	g_return_val_if_fail(message != NULL && message[0] != '\0' && conv_name != NULL && conv_name[0] != '\0', 0);
+
+	stripped_message = purple_markup_strip_html(message);
+
 #if _HAZE_
 	if (conv_name[0] == '#')
 	{
 		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of search %s\n", G_STRFUNC, conv_name);
 		TwitterEndpointChat *endpoint = twitter_endpoint_chat_find(account, conv_name);
 		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_SEARCH);
-		return settings->send_message(endpoint, message);
+		rv = settings->send_message(endpoint, stripped_message);
+		g_free(stripped_message);
+		return rv;
 	} else if (!strcmp(conv_name, "Timeline: Home")) {
 		purple_debug_info(TWITTER_PROTOCOL_ID, "%s of home timeline\n", G_STRFUNC);
 		TwitterEndpointChat *endpoint = twitter_endpoint_chat_find(account, conv_name);
 		TwitterEndpointChatSettings *settings = twitter_get_endpoint_chat_settings(TWITTER_CHAT_TIMELINE);
-		return settings->send_message(endpoint, message);
+		rv = settings->send_message(endpoint, stripped_message);
+		g_free(stripped_message);
+		return rv;
 	}
 #endif
 
@@ -1248,10 +1263,12 @@ static int twitter_send_im(PurpleConnection *gc, const char *conv_name,
 	buddy_name = twitter_conv_name_to_buddy_name(account, conv_name);
 	if (im_type == TWITTER_IM_TYPE_DM)
 	{
-		return twitter_send_dm_do(gc, buddy_name, message, flags);
+		rv = twitter_send_dm_do(gc, buddy_name, stripped_message, flags);
 	} else {
-		return twitter_send_im_do(gc, buddy_name, message, flags);
+		rv = twitter_send_im_do(gc, buddy_name, stripped_message, flags);
 	}
+	g_free(stripped_message);
+	return rv;
 }
 
 static void twitter_set_info(PurpleConnection *gc, const char *info) {

@@ -348,7 +348,6 @@ static gboolean twitter_endpoint_chat_send_error_cb(PurpleAccount *account, cons
 	return FALSE; //give up trying
 }
 
-//TODO merge me
 int twitter_endpoint_chat_send(TwitterEndpointChat *ctx, const gchar *message)
 {
 	PurpleAccount *account = ctx->account;
