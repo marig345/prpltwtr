@@ -322,7 +322,7 @@ PurpleConvChat *twitter_endpoint_chat_get_conv(TwitterEndpointChat *endpoint_cha
 }
 #endif
 
-static void twitter_endpoint_chat_send_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx)
+static void twitter_endpoint_chat_send_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _ctx)
 {
 	TwitterEndpointChat *ctx = _ctx;
 	TwitterTweet *tweet = twitter_status_node_parse(node);

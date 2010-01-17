@@ -1132,13 +1132,20 @@ static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const
 }
 
 
+static void twitter_send_dm_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
+{
+	if (last && _who)
+		g_free(_who);
+}
 static gboolean twitter_send_dm_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
 {
-	//TODO: this doesn't work yet
 	gchar *who = _who;
 	if (who)
 	{
-		purple_conv_present_error(who, account, "Error sending dm");
+		gchar *conv_name = twitter_buddy_name_to_conv_name(account, _who, TWITTER_IM_TYPE_DM);
+		purple_conv_present_error(conv_name, account, "Error sending tweet");
+		g_free(who);
+		g_free(conv_name);
 	}
 
 	return FALSE; //give up trying
@@ -1152,11 +1159,17 @@ static int twitter_send_dm_do(PurpleConnection *gc, const char *who,
 	twitter_api_send_dms(purple_connection_get_account(gc),
 			who,
 			statuses,
-			NULL,
+			twitter_send_dm_success_cb,
 			twitter_send_dm_error_cb,
-			NULL); //TODO
+			g_strdup(who)); //TODO
 
 	return 1;
+}
+
+static void twitter_send_im_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
+{
+	if (last && _who)
+		g_free(_who);
 }
 
 static gboolean twitter_send_im_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
@@ -1165,7 +1178,10 @@ static gboolean twitter_send_im_error_cb(PurpleAccount *account, const TwitterRe
 	gchar *who = _who;
 	if (who)
 	{
-		purple_conv_present_error(who, account, "Error sending tweet");
+		gchar *conv_name = twitter_buddy_name_to_conv_name(account, _who, TWITTER_IM_TYPE_AT_MSG);
+		purple_conv_present_error(conv_name, account, "Error sending tweet");
+		g_free(who);
+		g_free(conv_name);
 	}
 
 	return FALSE; //give up trying
@@ -1188,9 +1204,9 @@ static int twitter_send_im_do(PurpleConnection *gc, const char *who,
 	twitter_api_set_statuses(purple_connection_get_account(gc),
 			statuses,
 			in_reply_to_status_id,
-			NULL,
+			twitter_send_im_success_cb,
 			twitter_send_im_error_cb,
-			NULL); //TODO
+			g_strdup(who)); //TODO
 
 	g_free(added_text);
 
