@@ -143,15 +143,13 @@ void twitter_search (PurpleAccount *account, const char *query,
 		TwitterSearchSuccessFunc success_cb, TwitterSearchErrorFunc error_cb,
 		gpointer data)
 {
-	/* by default "search.twitter.com" */
-	const char *search_host_url = twitter_option_host_search_url(account);
 	TwitterSearchContext *ctx = g_slice_new0 (TwitterSearchContext);
 	ctx->account = account;
 	ctx->user_data = data;
 	ctx->success_func = success_cb;
 	ctx->error_func = error_cb;
 	twitter_send_request(account, FALSE,
-			search_host_url, "/search.atom", query,
+			twitter_option_url_get_search_results(account), query,
 			twitter_send_search_success_cb, NULL, //TODO error
 			ctx);
 
