@@ -81,7 +81,7 @@
 #define TWITTER_PREF_URL_NEW_DM "new_dm_url"
 #define TWITTER_PREF_URL_NEW_DM_DEFAULT "twitter.com/direct_messages/new.xml"
 #define TWITTER_PREF_URL_GET_SAVED_SEARCHES "get_saved_searches_url"
-#define TWITTER_PREF_URL_GET_SAVED_SEARCHES_DEFAULT "search.twitter.com/saved_searches.xml"
+#define TWITTER_PREF_URL_GET_SAVED_SEARCHES_DEFAULT "twitter.com/saved_searches.xml"
 #define TWITTER_PREF_URL_GET_SEARCH_RESULTS "get_search_results_url"
 #define TWITTER_PREF_URL_GET_SEARCH_RESULTS_DEFAULT "search.twitter.com/search.atom"
 /***** END URLS *****/
