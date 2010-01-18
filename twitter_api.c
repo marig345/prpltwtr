@@ -402,11 +402,15 @@ void twitter_api_get_saved_searches (PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
+	const gchar *url = twitter_option_url_get_saved_searches(account);
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	twitter_send_request (account, FALSE,
-			twitter_option_url_get_saved_searches(account), NULL,
-			success_func, error_func, data);
+	if (url && url[0] != '\0')
+	{
+		twitter_send_request (account, FALSE,
+				url, NULL,
+				success_func, error_func, data);
+	}
 }
 
 void twitter_api_search (PurpleAccount *account,
