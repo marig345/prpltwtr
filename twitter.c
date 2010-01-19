@@ -845,7 +845,7 @@ static gboolean twitter_send_dm_error_cb(PurpleAccount *account, const TwitterRe
 	gchar *who = _who;
 	if (who)
 	{
-		gchar *conv_name = twitter_buddy_name_to_conv_name(account, _who, TWITTER_IM_TYPE_DM);
+		gchar *conv_name = twitter_endpoint_im_buddy_name_to_conv_name(twitter_endpoint_im_find(account, TWITTER_IM_TYPE_DM), _who);
 		purple_conv_present_error(conv_name, account, "Error sending tweet");
 		g_free(who);
 		g_free(conv_name);
@@ -881,7 +881,7 @@ static gboolean twitter_send_im_error_cb(PurpleAccount *account, const TwitterRe
 	gchar *who = _who;
 	if (who)
 	{
-		gchar *conv_name = twitter_buddy_name_to_conv_name(account, _who, TWITTER_IM_TYPE_AT_MSG);
+		gchar *conv_name = twitter_endpoint_im_buddy_name_to_conv_name(twitter_endpoint_im_find(account, TWITTER_IM_TYPE_AT_MSG), _who);
 		purple_conv_present_error(conv_name, account, "Error sending tweet");
 		g_free(who);
 		g_free(conv_name);

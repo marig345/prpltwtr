@@ -23,6 +23,7 @@ typedef struct
 {
 	TwitterImType type;
 	const gchar *since_id_setting_id;
+	gchar *(*buddy_to_conv_name)(PurpleAccount *account, const char *buddy_name);
 	int (*timespan_func)(PurpleAccount *account);
 	TwitterApiImAllFunc get_im_func;
 	TwitterSendRequestMultiPageAllSuccessFunc success_cb;
@@ -49,13 +50,15 @@ typedef struct
 TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings, gboolean retrieve_history, gint initial_max_retrieve);
 void twitter_endpoint_im_free(TwitterEndpointIm *ctx);
 
+TwitterEndpointIm *twitter_endpoint_im_find(PurpleAccount *account, TwitterImType type);
+
 void twitter_endpoint_im_settings_save_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings, long long since_id);
 long long twitter_endpoint_im_settings_load_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings);
 void twitter_endpoint_im_set_since_id(TwitterEndpointIm *ctx, long long since_id);
 long long twitter_endpoint_im_get_since_id(TwitterEndpointIm *ctx);
 
 void twitter_endpoint_im_start(TwitterEndpointIm *ctx);
-char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type);
+char *twitter_endpoint_im_buddy_name_to_conv_name(TwitterEndpointIm *im, const char *name);
 void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
 		char *buddy_name,
 		TwitterTweet *s);

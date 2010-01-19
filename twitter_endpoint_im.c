@@ -1,18 +1,28 @@
 #include "twitter_endpoint_im.h"
 #include "twitter_util.h"
+#include "twitter_conn.h"
+
 static void twitter_endpoint_im_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 static void twitter_endpoint_im_start_timer(TwitterEndpointIm *ctx);
 
-char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
+TwitterEndpointIm *twitter_endpoint_im_find(PurpleAccount *account, TwitterImType type)
 {
-	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
-	gboolean default_dm = twitter_option_default_dm(account);
-	if (default_dm && type != TWITTER_IM_TYPE_DM)
-		return g_strdup_printf("@%s", name);
-	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
-		return g_strdup_printf("d %s", name);
-	else
-		return g_strdup(name);
+	PurpleConnection *gc;
+	TwitterConnectionData *twitter;
+
+	g_return_val_if_fail(type >= 0 && type < TWITTER_IM_TYPE_UNKNOWN, NULL);
+
+	gc = purple_account_get_connection(account);
+	twitter = gc->proto_data;
+
+	return twitter->endpoint_ims[type];
+}
+
+char *twitter_endpoint_im_buddy_name_to_conv_name(TwitterEndpointIm *im, const char *name)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0' && im != NULL, NULL);
+
+	return im->settings->buddy_to_conv_name(im->account, name);
 }
 
 
@@ -169,7 +179,7 @@ void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
 			s->id,
 			ctx->settings->type == TWITTER_IM_TYPE_AT_MSG);
 
-	conv_name = twitter_buddy_name_to_conv_name(account, buddy_name, ctx->settings->type);
+	conv_name = twitter_endpoint_im_buddy_name_to_conv_name(ctx, buddy_name);
 
 	//Account received an im
 	/* TODO get in_reply_to_status? s->in_reply_to_screen_name
