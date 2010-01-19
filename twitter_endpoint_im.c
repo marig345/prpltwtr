@@ -5,6 +5,11 @@
 static void twitter_endpoint_im_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 static void twitter_endpoint_im_start_timer(TwitterEndpointIm *ctx);
 
+static TwitterImType twitter_account_get_default_im_type(PurpleAccount *account)
+{
+	return twitter_option_default_dm(account) ? TWITTER_IM_TYPE_DM : TWITTER_IM_TYPE_AT_MSG;
+}
+
 TwitterEndpointIm *twitter_endpoint_im_find(PurpleAccount *account, TwitterImType type)
 {
 	PurpleConnection *gc;
@@ -21,8 +26,9 @@ TwitterEndpointIm *twitter_endpoint_im_find(PurpleAccount *account, TwitterImTyp
 char *twitter_endpoint_im_buddy_name_to_conv_name(TwitterEndpointIm *im, const char *name)
 {
 	g_return_val_if_fail(name != NULL && name[0] != '\0' && im != NULL, NULL);
-
-	return im->settings->buddy_to_conv_name(im->account, name);
+	return twitter_account_get_default_im_type(im->account) == im->settings->type ?
+		g_strdup(name) :
+		g_strdup_printf("%s%s", im->settings->conv_id, name);
 }
 
 

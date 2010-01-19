@@ -7,15 +7,6 @@ typedef struct
 	gpointer user_data;
 } TwitterLastSinceIdRequest;
 
-static gchar *twitter_endpoint_reply_buddy_to_conv_name(PurpleAccount *account, const char *name)
-{
-	gboolean default_dm = twitter_option_default_dm(account);
-	if (default_dm)
-		return g_strdup_printf("@%s", name);
-	else
-		return g_strdup(name);
-}
-
 static void twitter_get_replies_timeout_error_cb (PurpleAccount *account,
 		const TwitterRequestErrorData *error_data,
 		gpointer user_data)
@@ -133,7 +124,7 @@ static TwitterEndpointImSettings TwitterEndpointReplySettings =
 {
 	TWITTER_IM_TYPE_AT_MSG,
 	"twitter_last_reply_id",
-	twitter_endpoint_reply_buddy_to_conv_name,
+	"@", //conv_id
 	twitter_option_replies_timeout,
 	twitter_api_get_replies_all,
 	twitter_get_replies_all_cb,

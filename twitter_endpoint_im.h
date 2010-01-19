@@ -23,7 +23,7 @@ typedef struct
 {
 	TwitterImType type;
 	const gchar *since_id_setting_id;
-	gchar *(*buddy_to_conv_name)(PurpleAccount *account, const char *buddy_name);
+	const gchar *conv_id;
 	int (*timespan_func)(PurpleAccount *account);
 	TwitterApiImAllFunc get_im_func;
 	TwitterSendRequestMultiPageAllSuccessFunc success_cb;

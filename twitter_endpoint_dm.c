@@ -7,15 +7,6 @@ typedef struct
 	gpointer user_data;
 } TwitterLastSinceIdRequest;
 
-static gchar *twitter_endpoint_dm_buddy_to_conv_name(PurpleAccount *account, const char *name)
-{
-	gboolean default_dm = twitter_option_default_dm(account);
-	if (!default_dm)
-		return g_strdup_printf("d %s", name);
-	else
-		return g_strdup(name);
-}
-
 static void _process_dms(PurpleAccount *account,
 		GList *statuses,
 		TwitterConnectionData *twitter)
@@ -112,7 +103,7 @@ static TwitterEndpointImSettings TwitterEndpointDmSettings =
 {
 	TWITTER_IM_TYPE_DM,
 	"twitter_last_dm_id",
-	twitter_endpoint_dm_buddy_to_conv_name,
+	"d ", //conv_id
 	twitter_option_dms_timeout,
 	twitter_api_get_dms_all,
 	twitter_get_dms_all_cb,
