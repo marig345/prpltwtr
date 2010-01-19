@@ -55,5 +55,9 @@ void twitter_endpoint_im_set_since_id(TwitterEndpointIm *ctx, long long since_id
 long long twitter_endpoint_im_get_since_id(TwitterEndpointIm *ctx);
 
 void twitter_endpoint_im_start(TwitterEndpointIm *ctx);
+char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type);
+void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
+		char *buddy_name,
+		TwitterTweet *s);
 
 #endif

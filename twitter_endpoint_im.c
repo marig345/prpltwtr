@@ -3,6 +3,19 @@
 static void twitter_endpoint_im_get_last_since_id_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 static void twitter_endpoint_im_start_timer(TwitterEndpointIm *ctx);
 
+char *twitter_buddy_name_to_conv_name(PurpleAccount *account, const char *name, TwitterImType type)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
+	gboolean default_dm = twitter_option_default_dm(account);
+	if (default_dm && type != TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("@%s", name);
+	else if (!default_dm && type == TWITTER_IM_TYPE_DM)
+		return g_strdup_printf("d %s", name);
+	else
+		return g_strdup(name);
+}
+
+
 TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings, gboolean retrieve_history, gint initial_max_retrieve)
 {
 	TwitterEndpointIm *endpoint = g_new0(TwitterEndpointIm, 1);
@@ -130,5 +143,43 @@ long long twitter_endpoint_im_settings_load_since_id(PurpleAccount *account, Twi
 void twitter_endpoint_im_settings_save_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings, long long since_id)
 {
 	purple_account_set_long_long(account, settings->since_id_setting_id, since_id);
+}
+
+//TODO IM: rename
+void twitter_status_data_update_conv(TwitterEndpointIm *ctx,
+		char *buddy_name,
+		TwitterTweet *s)
+{
+	PurpleAccount *account = ctx->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	gchar *conv_name;
+	gchar *tweet;
+
+	if (!s || !s->text)
+		return;
+
+	if (s->id && s->id > twitter_endpoint_im_get_since_id(ctx))
+	{
+		purple_debug_info (TWITTER_PROTOCOL_ID, "saving %s\n", G_STRFUNC);
+		twitter_endpoint_im_set_since_id(ctx, s->id);
+	}
+	tweet = twitter_format_tweet(account,
+			buddy_name,
+			s->text,
+			s->id,
+			ctx->settings->type == TWITTER_IM_TYPE_AT_MSG);
+
+	conv_name = twitter_buddy_name_to_conv_name(account, buddy_name, ctx->settings->type);
+
+	//Account received an im
+	/* TODO get in_reply_to_status? s->in_reply_to_screen_name
+	 * s->in_reply_to_status_id */
+
+	serv_got_im(gc, conv_name,
+			tweet,
+			PURPLE_MESSAGE_RECV,
+			s->created_at);
+
+	g_free(tweet);
 }
 
