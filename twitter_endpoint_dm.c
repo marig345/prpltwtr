@@ -1,4 +1,39 @@
 #include "twitter_endpoint_dm.h"
+#include "twitter_util.h"
+
+static void twitter_send_dm_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
+{
+	if (last && _who)
+		g_free(_who);
+}
+static gboolean twitter_send_dm_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
+{
+	gchar *who = _who;
+	if (who)
+	{
+		gchar *conv_name = twitter_endpoint_im_buddy_name_to_conv_name(twitter_endpoint_im_find(account, TWITTER_IM_TYPE_DM), _who);
+		purple_conv_present_error(conv_name, account, "Error sending tweet");
+		g_free(who);
+		g_free(conv_name);
+	}
+
+	return FALSE; //give up trying
+}
+
+static int twitter_send_dm_do(PurpleAccount *account, const char *who,
+		const char *message, PurpleMessageFlags flags)
+{
+	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, NULL);
+
+	twitter_api_send_dms(account,
+			who,
+			statuses,
+			twitter_send_dm_success_cb,
+			twitter_send_dm_error_cb,
+			g_strdup(who)); //TODO
+
+	return 1;
+}
 
 typedef struct 
 {
@@ -104,6 +139,7 @@ static TwitterEndpointImSettings TwitterEndpointDmSettings =
 	TWITTER_IM_TYPE_DM,
 	"twitter_last_dm_id",
 	"d ", //conv_id
+	twitter_send_dm_do,
 	twitter_option_dms_timeout,
 	twitter_api_get_dms_all,
 	twitter_get_dms_all_cb,

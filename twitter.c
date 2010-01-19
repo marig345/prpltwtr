@@ -824,6 +824,12 @@ static TwitterImType twitter_conv_name_to_type(PurpleAccount *account, const cha
 		return TWITTER_IM_TYPE_AT_MSG;
 }
 
+static TwitterEndpointIm *twitter_conv_name_to_endpoint_im(PurpleAccount *account, const char *name)
+{
+	TwitterImType type = twitter_conv_name_to_type(account, name);
+	return twitter_endpoint_im_find(account, type);
+}
+
 static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const char *name)
 {
 	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
@@ -832,88 +838,6 @@ static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const
 	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
 		return name + 2;
 	return name;
-}
-
-
-static void twitter_send_dm_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
-{
-	if (last && _who)
-		g_free(_who);
-}
-static gboolean twitter_send_dm_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
-{
-	gchar *who = _who;
-	if (who)
-	{
-		gchar *conv_name = twitter_endpoint_im_buddy_name_to_conv_name(twitter_endpoint_im_find(account, TWITTER_IM_TYPE_DM), _who);
-		purple_conv_present_error(conv_name, account, "Error sending tweet");
-		g_free(who);
-		g_free(conv_name);
-	}
-
-	return FALSE; //give up trying
-}
-
-static int twitter_send_dm_do(PurpleConnection *gc, const char *who,
-		const char *message, PurpleMessageFlags flags)
-{
-	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, NULL);
-
-	twitter_api_send_dms(purple_connection_get_account(gc),
-			who,
-			statuses,
-			twitter_send_dm_success_cb,
-			twitter_send_dm_error_cb,
-			g_strdup(who)); //TODO
-
-	return 1;
-}
-
-static void twitter_send_im_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
-{
-	if (last && _who)
-		g_free(_who);
-}
-
-static gboolean twitter_send_im_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error, gpointer _who)
-{
-	//TODO: this doesn't work yet
-	gchar *who = _who;
-	if (who)
-	{
-		gchar *conv_name = twitter_endpoint_im_buddy_name_to_conv_name(twitter_endpoint_im_find(account, TWITTER_IM_TYPE_AT_MSG), _who);
-		purple_conv_present_error(conv_name, account, "Error sending tweet");
-		g_free(who);
-		g_free(conv_name);
-	}
-
-	return FALSE; //give up trying
-}
-
-static int twitter_send_im_do(PurpleConnection *gc, const char *who,
-		const char *message, PurpleMessageFlags flags)
-{
-	TwitterConnectionData *twitter = gc->proto_data;
-	gchar *added_text = g_strdup_printf("@%s", who);
-	GArray *statuses = twitter_utf8_get_segments(message, MAX_TWEET_LENGTH, added_text);
-	long long in_reply_to_status_id = 0;
-	const gchar *reply_id;
-
-	reply_id = (const gchar *)g_hash_table_lookup (
-			twitter->user_reply_id_table, who);
-	if (reply_id)
-		in_reply_to_status_id = strtoll (reply_id, NULL, 10);
-
-	twitter_api_set_statuses(purple_connection_get_account(gc),
-			statuses,
-			in_reply_to_status_id,
-			twitter_send_im_success_cb,
-			twitter_send_im_error_cb,
-			g_strdup(who)); //TODO
-
-	g_free(added_text);
-
-	return 1;
 }
 
 /* A few options here
@@ -926,7 +850,7 @@ static int twitter_send_im_do(PurpleConnection *gc, const char *who,
 static int twitter_send_im(PurpleConnection *gc, const char *conv_name,
 		const char *message, PurpleMessageFlags flags)
 {
-	TwitterImType im_type;
+	TwitterEndpointIm *im;
 	const char *buddy_name;
 	PurpleAccount *account = purple_connection_get_account(gc);
 	char *stripped_message;
@@ -956,14 +880,9 @@ static int twitter_send_im(PurpleConnection *gc, const char *conv_name,
 #endif
 
 	//TODO, this should be part of im settings
-	im_type = twitter_conv_name_to_type(account, conv_name);
+	im = twitter_conv_name_to_endpoint_im(account, conv_name);
 	buddy_name = twitter_conv_name_to_buddy_name(account, conv_name);
-	if (im_type == TWITTER_IM_TYPE_DM)
-	{
-		rv = twitter_send_dm_do(gc, buddy_name, stripped_message, flags);
-	} else {
-		rv = twitter_send_im_do(gc, buddy_name, stripped_message, flags);
-	}
+	rv = im->settings->send_im(account, buddy_name, stripped_message, flags);
 	g_free(stripped_message);
 	return rv;
 }

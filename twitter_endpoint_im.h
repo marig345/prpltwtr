@@ -24,6 +24,7 @@ typedef struct
 	TwitterImType type;
 	const gchar *since_id_setting_id;
 	const gchar *conv_id;
+	int (*send_im)(PurpleAccount *account, const char *buddy_name, const char *message, PurpleMessageFlags flags);
 	int (*timespan_func)(PurpleAccount *account);
 	TwitterApiImAllFunc get_im_func;
 	TwitterSendRequestMultiPageAllSuccessFunc success_cb;
