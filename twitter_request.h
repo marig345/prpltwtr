@@ -43,13 +43,13 @@ typedef struct
 } TwitterRequestErrorData;
 
 
-typedef void (*TwitterSendRequestSuccessFunc)(PurpleAccount *acct, xmlnode *node, gpointer user_data);
-typedef void (*TwitterSendRequestErrorFunc)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
+typedef void (*TwitterSendRequestSuccessFunc)(PurpleAccount *account, xmlnode *node, gpointer user_data);
+typedef void (*TwitterSendRequestErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
 typedef struct _TwitterMultiPageRequestData TwitterMultiPageRequestData;
 
-typedef gboolean (*TwitterSendRequestMultiPageSuccessFunc)(PurpleAccount *acct, xmlnode *node, gboolean last_page, TwitterMultiPageRequestData *request, gpointer user_data);
-typedef gboolean (*TwitterSendRequestMultiPageErrorFunc)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
+typedef gboolean (*TwitterSendRequestMultiPageSuccessFunc)(PurpleAccount *account, xmlnode *node, gboolean last_page, TwitterMultiPageRequestData *request, gpointer user_data);
+typedef gboolean (*TwitterSendRequestMultiPageErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
 struct _TwitterMultiPageRequestData
 {
@@ -63,8 +63,8 @@ struct _TwitterMultiPageRequestData
 };
 
 
-typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(PurpleAccount *acct, GList *nodes, gpointer user_data);
-typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data);
+typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(PurpleAccount *account, GList *nodes, gpointer user_data);
+typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
 void twitter_send_request(PurpleAccount *account, gboolean post,
 		const char *url, const char *query_string,

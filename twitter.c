@@ -543,7 +543,7 @@ static void twitter_get_rate_limit_status_cb(PurpleAccount *account, xmlnode *no
 /*
  * prpl functions
  */
-static const char *twitter_list_icon(PurpleAccount *acct, PurpleBuddy *buddy)
+static const char *twitter_list_icon(PurpleAccount *account, PurpleBuddy *buddy)
 {
 	/* shamelessly steal (er, borrow) the meanwhile protocol icon. it's cute! */
 	return "meanwhile";
@@ -592,7 +592,7 @@ static void twitter_tooltip_text(PurpleBuddy *buddy,
 /* everyone will be online
  * Future: possibly have offline mode for people who haven't updated in a while
  */
-static GList *twitter_status_types(PurpleAccount *acct)
+static GList *twitter_status_types(PurpleAccount *account)
 {
 	GList *types = NULL;
 	PurpleStatusType *type;
@@ -636,15 +636,15 @@ static GList *twitter_status_types(PurpleAccount *acct)
 static void twitter_action_get_user_info(PurplePluginAction *action)
 {
 	PurpleConnection *gc = (PurpleConnection *)action->context;
-	PurpleAccount *acct = purple_connection_get_account(gc);
-	twitter_api_get_friends(acct, twitter_get_friends_cb, NULL, NULL);
+	PurpleAccount *account = purple_connection_get_account(gc);
+	twitter_api_get_friends(account, twitter_get_friends_cb, NULL, NULL);
 }
 
 static void twitter_action_set_status_ok(PurpleConnection *gc, PurpleRequestFields *fields)
 {
-	PurpleAccount *acct = purple_connection_get_account(gc);
+	PurpleAccount *account = purple_connection_get_account(gc);
 	const char* status = purple_request_fields_get_string(fields, "status");
-	purple_account_set_status(acct, TWITTER_STATUS_ONLINE, TRUE, "message", status, NULL);
+	purple_account_set_status(account, TWITTER_STATUS_ONLINE, TRUE, "message", status, NULL);
 }
 static void twitter_action_set_status(PurplePluginAction *action)
 {
@@ -674,8 +674,8 @@ static void twitter_action_set_status(PurplePluginAction *action)
 static void twitter_action_get_rate_limit_status(PurplePluginAction *action)
 {
 	PurpleConnection *gc = (PurpleConnection *)action->context;
-	PurpleAccount *acct = purple_connection_get_account(gc);
-	twitter_api_get_rate_limit_status(acct, twitter_get_rate_limit_status_cb, NULL, NULL);
+	PurpleAccount *account = purple_connection_get_account(gc);
+	twitter_api_get_rate_limit_status(account, twitter_get_rate_limit_status_cb, NULL, NULL);
 }
 
 /* this is set to the actions member of the PurplePluginInfo struct at the
@@ -708,7 +708,7 @@ typedef struct
 	gpointer user_data;
 } TwitterLastSinceIdRequest;
 
-static void twitter_verify_connection(PurpleAccount *acct)
+static void twitter_verify_connection(PurpleAccount *account)
 {
 	gboolean retrieve_history;
 
@@ -717,10 +717,10 @@ static void twitter_verify_connection(PurpleAccount *acct)
 
 	/* If history retrieval enabled, read last reply id from config file.
 	 * There's no config file, just set last reply id to 0 */
-	retrieve_history = twitter_option_get_history(acct);
+	retrieve_history = twitter_option_get_history(account);
 
 	//If we don't have a stored last reply id, we don't want to get the entire history (EVERY reply)
-	PurpleConnection *gc = purple_account_get_connection(acct);
+	PurpleConnection *gc = purple_account_get_connection(account);
 
 	if (purple_connection_get_state(gc) == PURPLE_CONNECTING) {
 
@@ -729,25 +729,25 @@ static void twitter_verify_connection(PurpleAccount *acct)
 				3);  /* total number of steps */
 	}
 
-	if (twitter_option_get_following(acct))
+	if (twitter_option_get_following(account))
 	{
-		twitter_api_get_friends(acct,
+		twitter_api_get_friends(account,
 				twitter_get_friends_verify_connection_cb,
 				twitter_get_friends_verify_error_cb,
 				NULL);
 	} else {
-		twitter_connected(acct);
-		twitter_set_all_buddies_online(acct);
+		twitter_connected(account);
+		twitter_set_all_buddies_online(account);
 	}
 }
 
-static void twitter_login(PurpleAccount *acct)
+static void twitter_login(PurpleAccount *account)
 {
-	PurpleConnection *gc = purple_account_get_connection(acct);
+	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = g_new0(TwitterConnectionData, 1);
 	gc->proto_data = twitter;
 
-	purple_debug_info(TWITTER_PROTOCOL_ID, "logging in %s\n", acct->username);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "logging in %s\n", account->username);
 
 	/* key: gchar *, value: TwitterEndpointChat */
 	twitter->chat_contexts = g_hash_table_new_full(
@@ -764,7 +764,7 @@ static void twitter_login(PurpleAccount *acct)
 			2);  /* total number of steps */
 
 
-	twitter_verify_connection(acct);
+	twitter_verify_connection(account);
 }
 
 static void twitter_endpoint_im_free_foreach(TwitterConnectionData *conn, TwitterEndpointIm *im, gpointer data)
@@ -794,7 +794,7 @@ static void twitter_close(PurpleConnection *gc)
 	g_free(twitter);
 }
 
-static void twitter_set_status_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
+static void twitter_set_status_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	const char *message;
 	if (error_data->type == TWITTER_REQUEST_ERROR_SERVER || error_data->type == TWITTER_REQUEST_ERROR_TWITTER_GENERAL)
@@ -904,20 +904,20 @@ static void twitter_get_info(PurpleConnection *gc, const char *username) {
 }
 
 
-static void twitter_set_status(PurpleAccount *acct, PurpleStatus *status) {
-	gboolean sync_status = twitter_option_sync_status(acct);
+static void twitter_set_status(PurpleAccount *account, PurpleStatus *status) {
+	gboolean sync_status = twitter_option_sync_status(account);
 	if (!sync_status)
 		return ;
 
 	//TODO: I'm pretty sure this is broken
 	const char *msg = purple_status_get_attr_string(status, "message");
 	purple_debug_info(TWITTER_PROTOCOL_ID, "setting %s's status to %s: %s\n",
-			acct->username, purple_status_get_name(status), msg);
+			account->username, purple_status_get_name(status), msg);
 
 	if (msg && strcmp("", msg))
 	{
 		//TODO, sucecss && fail
-		twitter_api_set_status(acct, msg, 0,
+		twitter_api_set_status(account, msg, 0,
 				NULL, twitter_set_status_error_cb, NULL);
 	}
 }
@@ -1079,7 +1079,7 @@ static GList *twitter_blist_node_menu(PurpleBlistNode *node) {
 /* normalize a username (e.g. remove whitespace, add default domain, etc.)
  * for twitter, this is a noop.
  */
-static const char *twitter_normalize(const PurpleAccount *acct,
+static const char *twitter_normalize(const PurpleAccount *account,
 		const char *input) {
 	return NULL;
 }

@@ -324,7 +324,7 @@ static void twitter_multipage_all_request_data_free(TwitterMultiPageAllRequestDa
 	g_free(request_data_all);
 }
 
-static gboolean twitter_send_request_multipage_all_success_cb(PurpleAccount *acct,
+static gboolean twitter_send_request_multipage_all_success_cb(PurpleAccount *account,
 		xmlnode *node,
 		gboolean last_page,
 		TwitterMultiPageRequestData *request_multi,
@@ -340,7 +340,7 @@ static gboolean twitter_send_request_multipage_all_success_cb(PurpleAccount *acc
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s last_page: %d current_count: %d max_count: %d per page: %d\n", G_STRFUNC, last_page ? 1 : 0, request_data_all->current_count, request_data_all->max_count, request_multi->expected_count);
 	if (last_page || (request_data_all->max_count > 0 && request_data_all->current_count >= request_data_all->max_count))
 	{
-		request_data_all->success_callback(acct, request_data_all->nodes, request_data_all->user_data);
+		request_data_all->success_callback(account, request_data_all->nodes, request_data_all->user_data);
 		twitter_multipage_all_request_data_free(request_data_all);
 		return FALSE;
 	} else if (request_data_all->max_count > 0 && (request_data_all->current_count + request_multi->expected_count > request_data_all->max_count)) {
@@ -349,10 +349,10 @@ static gboolean twitter_send_request_multipage_all_success_cb(PurpleAccount *acc
 	return TRUE;
 }
 
-static gboolean twitter_send_request_multipage_all_error_cb(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data)
+static gboolean twitter_send_request_multipage_all_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	TwitterMultiPageAllRequestData *request_data_all = user_data;
-	if (request_data_all->error_callback && request_data_all->error_callback(acct, error_data, request_data_all->user_data))
+	if (request_data_all->error_callback && request_data_all->error_callback(account, error_data, request_data_all->user_data))
 		return TRUE;
 	twitter_multipage_all_request_data_free(request_data_all);
 	return FALSE;

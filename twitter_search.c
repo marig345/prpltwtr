@@ -90,7 +90,7 @@ static gint _twitter_search_results_sort(gconstpointer _a, gconstpointer _b)
 		return 0;
 }
 
-static void twitter_send_search_success_cb(PurpleAccount *acct, xmlnode *response_node, gpointer user_data)
+static void twitter_send_search_success_cb(PurpleAccount *account, xmlnode *response_node, gpointer user_data)
 {
 	TwitterSearchContext *ctx = user_data;
 	GArray *search_results = NULL;

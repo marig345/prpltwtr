@@ -118,7 +118,7 @@ static void twitter_get_last_since_id_error_cb(PurpleAccount *account, const Twi
 
 static void twitter_get_dms_last_since_id(PurpleAccount *account,
 	void (*success_cb)(PurpleAccount *account, long long id, gpointer user_data),
-	void (*error_cb)(PurpleAccount *acct, const TwitterRequestErrorData *error_data, gpointer user_data),
+	void (*error_cb)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data),
 	gpointer user_data)
 {
 	TwitterLastSinceIdRequest *request = g_new0(TwitterLastSinceIdRequest, 1);
