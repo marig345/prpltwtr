@@ -434,7 +434,7 @@ static void twitter_connected(PurpleAccount *account)
 			twitter_endpoint_im_new(account,
 				twitter_endpoint_dm_get_settings(),
 				twitter_option_get_history(account),
-				TWITTER_INITIAL_REPLIES_COUNT));
+				TWITTER_INITIAL_DMS_COUNT));
 
 #if _HAZE_
 	purple_signal_connect(purple_conversations_get_handle(), "conversation-created",
@@ -809,35 +809,6 @@ static void twitter_set_status_error_cb(PurpleAccount *acct, const TwitterReques
 			("Twitter Set Status"),
 			("Error setting Twitter Status"),
 			(message));
-}
-
-static TwitterImType twitter_conv_name_to_type(PurpleAccount *account, const char *name)
-{
-	g_return_val_if_fail(name != NULL && name[0] != '\0', TWITTER_IM_TYPE_UNKNOWN);
-	if (name[0] == '@')
-		return TWITTER_IM_TYPE_AT_MSG;
-	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
-		return TWITTER_IM_TYPE_DM;
-	if (twitter_option_default_dm(account))
-		return TWITTER_IM_TYPE_DM;
-	else
-		return TWITTER_IM_TYPE_AT_MSG;
-}
-
-static TwitterEndpointIm *twitter_conv_name_to_endpoint_im(PurpleAccount *account, const char *name)
-{
-	TwitterImType type = twitter_conv_name_to_type(account, name);
-	return twitter_endpoint_im_find(account, type);
-}
-
-static const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const char *name)
-{
-	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
-	if (name[0] == '@')
-		return name + 1;
-	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
-		return name + 2;
-	return name;
 }
 
 /* A few options here

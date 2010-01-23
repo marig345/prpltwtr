@@ -52,6 +52,8 @@ TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpoi
 void twitter_endpoint_im_free(TwitterEndpointIm *ctx);
 
 TwitterEndpointIm *twitter_endpoint_im_find(PurpleAccount *account, TwitterImType type);
+TwitterEndpointIm *twitter_conv_name_to_endpoint_im(PurpleAccount *account, const char *name);
+const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const char *name);
 
 void twitter_endpoint_im_settings_save_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings, long long since_id);
 long long twitter_endpoint_im_settings_load_since_id(PurpleAccount *account, TwitterEndpointImSettings *settings);

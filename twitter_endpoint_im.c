@@ -31,6 +31,36 @@ char *twitter_endpoint_im_buddy_name_to_conv_name(TwitterEndpointIm *im, const c
 		g_strdup_printf("%s%s", im->settings->conv_id, name);
 }
 
+const char *twitter_conv_name_to_buddy_name(PurpleAccount *account, const char *name)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', NULL);
+	if (name[0] == '@')
+		return name + 1;
+	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
+		return name + 2;
+	return name;
+}
+
+
+static TwitterImType twitter_conv_name_to_type(PurpleAccount *account, const char *name)
+{
+	g_return_val_if_fail(name != NULL && name[0] != '\0', TWITTER_IM_TYPE_UNKNOWN);
+	if (name[0] == '@')
+		return TWITTER_IM_TYPE_AT_MSG;
+	if (name[0] == 'd' && name[1] == ' ' && name[2] != '\0')
+		return TWITTER_IM_TYPE_DM;
+	if (twitter_option_default_dm(account))
+		return TWITTER_IM_TYPE_DM;
+	else
+		return TWITTER_IM_TYPE_AT_MSG;
+}
+
+TwitterEndpointIm *twitter_conv_name_to_endpoint_im(PurpleAccount *account, const char *name)
+{
+	TwitterImType type = twitter_conv_name_to_type(account, name);
+	return twitter_endpoint_im_find(account, type);
+}
+
 
 TwitterEndpointIm *twitter_endpoint_im_new(PurpleAccount *account, TwitterEndpointImSettings *settings, gboolean retrieve_history, gint initial_max_retrieve)
 {
