@@ -113,7 +113,7 @@ static void twitter_api_get_all_since(PurpleAccount *account,
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 	twitter_send_request_multipage_all_params(account,
-			twitter_option_url_get_home_timeline(account), params,
+			url, params,
 			success_func, error_func,
 			count_per_page, max_count, data);
 	twitter_request_params_free(params);
