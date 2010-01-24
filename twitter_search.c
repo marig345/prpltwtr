@@ -139,7 +139,7 @@ static void twitter_send_search_success_cb(PurpleAccount *account, xmlnode *resp
 	g_slice_free (TwitterSearchContext, ctx);
 }
 
-void twitter_search (PurpleAccount *account, const char *query,
+void twitter_search(PurpleAccount *account, TwitterRequestParams *params,
 		TwitterSearchSuccessFunc success_cb, TwitterSearchErrorFunc error_cb,
 		gpointer data)
 {
@@ -152,8 +152,8 @@ void twitter_search (PurpleAccount *account, const char *query,
 		ctx->user_data = data;
 		ctx->success_func = success_cb;
 		ctx->error_func = error_cb;
-		twitter_send_request(account, FALSE,
-				search_url, query,
+		twitter_send_request_params(account, FALSE,
+				search_url, params,
 				twitter_send_search_success_cb, NULL, //TODO error
 				ctx);
 

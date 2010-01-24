@@ -8,6 +8,7 @@
 
 #include <glib.h>
 #include "twitter_xml.h"
+#include "twitter_request.h"
 
 typedef struct _TwitterSearchErrorData TwitterSearchErrorData;
 
@@ -27,8 +28,8 @@ typedef gboolean (*TwitterSearchErrorFunc)(PurpleAccount *account,
         const TwitterSearchErrorData *error_data,
         gpointer user_data);
 
-void twitter_search (PurpleAccount *account, const char *query,
-        TwitterSearchSuccessFunc success_cb, TwitterSearchErrorFunc error_cb,
-        gpointer data);
+void twitter_search(PurpleAccount *account, TwitterRequestParams *params,
+		TwitterSearchSuccessFunc success_cb, TwitterSearchErrorFunc error_cb,
+		gpointer data);
 
 #endif /* TWITTER_SEARCH_H_ */

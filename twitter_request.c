@@ -250,7 +250,7 @@ static gchar *twitter_request_params_to_string(TwitterRequestParams *params)
 	rv = g_string_append_uri_escaped(rv, p->value, NULL, TRUE);
 	for (i = 1; i < params->len; i++)
 	{
-		p = g_array_index(params, TwitterRequestParam *, 1);
+		p = g_array_index(params, TwitterRequestParam *, i);
 		rv = g_string_append_c(rv, '&');
 		rv = g_string_append_uri_escaped(rv, p->name, NULL, TRUE);
 		rv = g_string_append_c(rv, '=');
@@ -452,6 +452,23 @@ void twitter_send_request_multipage_all_max_count(PurpleAccount *account,
 			twitter_send_request_multipage_all_error_cb,
 			expected_count, request_data_all);
 }
+
+void twitter_send_request_multipage_all_params(PurpleAccount *account,
+		const char *url, TwitterRequestParams *params,
+		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
+		TwitterSendRequestMultiPageAllErrorFunc error_callback,
+		int expected_count, gint max_count, gpointer data)
+{
+	gchar *query_string = twitter_request_params_to_string(params);
+	twitter_send_request_multipage_all_max_count(account,
+			url, query_string,
+			success_callback,
+			error_callback,
+			expected_count, max_count,
+			data);
+	g_free(query_string);
+}
+
 
 /******************************************************
  *  Request with cursor

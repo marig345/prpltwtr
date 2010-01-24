@@ -104,6 +104,12 @@ void twitter_send_request_multipage_all_max_count(PurpleAccount *account,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
 		int expected_count, gint max_count, gpointer data);
 
+void twitter_send_request_multipage_all_params(PurpleAccount *account,
+		const char *url, TwitterRequestParams *params,
+		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
+		TwitterSendRequestMultiPageAllErrorFunc error_callback,
+		int expected_count, gint max_count, gpointer data);
+
 #define twitter_send_request_multipage_all(account, url, query_string, \
 		success_callback, error_callback, expected_count, data) \
 	twitter_send_request_multipage_all_max_count(account, url, query_string, \
