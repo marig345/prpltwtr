@@ -55,13 +55,14 @@ void twitter_api_get_friends(PurpleAccount *account,
 			success_func, error_func, data);
 }
 
-void twitter_api_get_home_timeline(PurpleAccount *account,
-		long long since_id,
-		int count,
-		int page,
-		TwitterSendRequestSuccessFunc success_func,
-		TwitterSendRequestErrorFunc error_func,
-		gpointer data)
+static void twitter_api_send_request_single(PurpleAccount *account,
+	const gchar *url,
+	long long since_id,
+	int count,
+	int page,
+	TwitterSendRequestSuccessFunc success_func,
+	TwitterSendRequestErrorFunc error_func,
+	gpointer data)
 {
 	TwitterRequestParams *params = twitter_request_params_new();
 	twitter_request_params_add(params, twitter_request_param_new_int("count", count));
@@ -72,10 +73,28 @@ void twitter_api_get_home_timeline(PurpleAccount *account,
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
 	twitter_send_request_params(account, FALSE,
-			twitter_option_url_get_home_timeline(account), params,
+			url, params,
 			success_func, error_func, data);
 
 	twitter_request_params_free(params);
+}
+
+void twitter_api_get_home_timeline(PurpleAccount *account,
+		long long since_id,
+		int count,
+		int page,
+		TwitterSendRequestSuccessFunc success_func,
+		TwitterSendRequestErrorFunc error_func,
+		gpointer data)
+{
+	twitter_api_send_request_single(account,
+		twitter_option_url_get_home_timeline(account),
+		since_id,
+		count,
+		page,
+		success_func,
+		error_func,
+		data);
 }
 
 void twitter_api_get_home_timeline_all(PurpleAccount *account,
@@ -107,17 +126,14 @@ void twitter_api_get_replies(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
-	char *query = since_id > 0 ?
-		g_strdup_printf("count=%d&page=%d&since_id=%lld", count, page, since_id) :
-		g_strdup_printf("count=%d&page=%d", count, page);
-
-	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-
-	twitter_send_request(account, FALSE,
-			twitter_option_url_get_mentions(account), query,
-			success_func, error_func, data);
-
-	g_free(query);
+	twitter_api_send_request_single(account,
+		twitter_option_url_get_mentions(account),
+		since_id,
+		count,
+		page,
+		success_func,
+		error_func,
+		data);
 }
 
 void twitter_api_get_replies_all(PurpleAccount *account,
@@ -150,17 +166,14 @@ void twitter_api_get_dms(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
-	char *query = since_id > 0 ?
-		g_strdup_printf("count=%d&page=%d&since_id=%lld", count, page, since_id) :
-		g_strdup_printf("count=%d&page=%d", count, page);
-
-	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-
-	twitter_send_request(account, FALSE,
-			twitter_option_url_get_dms(account), query,
-			success_func, error_func, data);
-
-	g_free(query);
+	twitter_api_send_request_single(account,
+		twitter_option_url_get_dms(account),
+		since_id,
+		count,
+		page,
+		success_func,
+		error_func,
+		data);
 }
 
 void twitter_api_get_dms_all(PurpleAccount *account,
