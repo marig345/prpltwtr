@@ -39,7 +39,7 @@ void twitter_api_get_rate_limit_status(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
-	twitter_send_request(account, FALSE,
+	twitter_send_request_params(account, FALSE,
 			twitter_option_url_get_rate_limit_status(account), NULL,
 			success_func, error_func, data);
 }
@@ -63,17 +63,19 @@ void twitter_api_get_home_timeline(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
-	char *query = since_id > 0 ?
-		g_strdup_printf("count=%d&page=%d&since_id=%lld", count, page, since_id) :
-		g_strdup_printf("count=%d&page=%d", count, page);
+	TwitterRequestParams *params = twitter_request_params_new();
+	twitter_request_params_add(params, twitter_request_param_new_int("count", count));
+	twitter_request_params_add(params, twitter_request_param_new_int("page", page));
+	if (since_id > 0)
+		twitter_request_params_add(params, twitter_request_param_new_int("since_id", since_id));
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	twitter_send_request(account, FALSE,
-			twitter_option_url_get_home_timeline(account), query,
+	twitter_send_request_params(account, FALSE,
+			twitter_option_url_get_home_timeline(account), params,
 			success_func, error_func, data);
 
-	g_free(query);
+	twitter_request_params_free(params);
 }
 
 void twitter_api_get_home_timeline_all(PurpleAccount *account,

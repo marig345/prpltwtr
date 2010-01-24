@@ -27,6 +27,23 @@
 
 #include <glib.h>
 
+typedef struct
+{
+	gchar *name;
+	gchar *value;
+} TwitterRequestParam;
+
+TwitterRequestParam *twitter_request_param_new(const gchar *name, const gchar *value);
+TwitterRequestParam *twitter_request_param_new_int(const gchar *name, int value);
+TwitterRequestParam *twitter_request_param_new_ll(const gchar *name, long long value);
+
+typedef GArray TwitterRequestParams;
+
+TwitterRequestParams *twitter_request_params_new();
+TwitterRequestParams *twitter_request_params_add(GArray *params, TwitterRequestParam *p);
+void twitter_request_params_free(TwitterRequestParams *params);
+void twitter_request_param_free(TwitterRequestParam *p);
+
 typedef enum
 {
 	TWITTER_REQUEST_ERROR_NONE,
@@ -68,6 +85,10 @@ typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *accou
 
 void twitter_send_request(PurpleAccount *account, gboolean post,
 		const char *url, const char *query_string,
+		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		gpointer data);
+void twitter_send_request_params(PurpleAccount *account, gboolean post,
+		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data);
 

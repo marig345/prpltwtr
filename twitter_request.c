@@ -136,7 +136,7 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 	g_free(request_data);
 }
 
-//TODO: this should really just take in an object of options. Getting unwieldy
+
 void twitter_send_request(PurpleAccount *account, gboolean post,
 		const char *url, const char *query_string,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
@@ -191,18 +191,90 @@ void twitter_send_request(PurpleAccount *account, gboolean post,
 	g_free(host);
 }
 
+TwitterRequestParam *twitter_request_param_new(const gchar *name, const gchar *value)
+{
+	TwitterRequestParam *p = g_new(TwitterRequestParam, 1);
+	p->name = g_strdup(name);
+	p->value = g_strdup(value);
+	return p;
+}
+TwitterRequestParam *twitter_request_param_new_int(const gchar *name, int value)
+{
+	TwitterRequestParam *p = g_new(TwitterRequestParam, 1);
+	p->name = g_strdup(name);
+	p->value = g_strdup_printf("%d", value);
+	return p;
+}
+TwitterRequestParam *twitter_request_param_new_ll(const gchar *name, long long value)
+{
+	TwitterRequestParam *p = g_new(TwitterRequestParam, 1);
+	p->name = g_strdup(name);
+	p->value = g_strdup_printf("%lld", value);
+	return p;
+}
+TwitterRequestParams *twitter_request_params_new()
+{
+	return g_array_new(FALSE, FALSE, sizeof(TwitterRequestParam *));
+}
+TwitterRequestParams *twitter_request_params_add(TwitterRequestParams *params, TwitterRequestParam *p)
+{
+	return g_array_append_val(params, p);
+}
+void twitter_request_params_free(TwitterRequestParams *params)
+{
+	int i;
+	if (!params)
+		return;
+	for (i = 0; i < params->len; i++)
+		twitter_request_param_free(g_array_index(params, TwitterRequestParam *, i));
+	g_array_free(params, FALSE);
+}
+void twitter_request_param_free(TwitterRequestParam *p)
+{
+	g_free(p->name);
+	g_free(p->value);
+	g_free(p);
+}
+
+static gchar *twitter_request_params_to_string(TwitterRequestParams *params)
+{
+	TwitterRequestParam *p;
+	GString *rv;
+	int i;
+	if (!params || !params->len)
+		return NULL;
+	p = g_array_index(params, TwitterRequestParam *, 0);
+	rv = g_string_new(NULL);
+	rv = g_string_append_uri_escaped(rv, p->name, NULL, TRUE);
+	rv = g_string_append_c(rv, '=');
+	rv = g_string_append_uri_escaped(rv, p->value, NULL, TRUE);
+	for (i = 1; i < params->len; i++)
+	{
+		p = g_array_index(params, TwitterRequestParam *, 1);
+		rv = g_string_append_c(rv, '&');
+		rv = g_string_append_uri_escaped(rv, p->name, NULL, TRUE);
+		rv = g_string_append_c(rv, '=');
+		rv = g_string_append_uri_escaped(rv, p->value, NULL, TRUE);
+	}
+	return g_string_free(rv, FALSE);
+
+}
+
+void twitter_send_request_params(PurpleAccount *account, gboolean post,
+		const char *url, TwitterRequestParams *params,
+		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		gpointer data)
+{
+	gchar *query_string = twitter_request_params_to_string(params);
+	twitter_send_request(account, post,
+			url, query_string,
+			success_callback, error_callback,
+			data);
+	g_free(query_string);
+}
+
 static int xmlnode_child_count(xmlnode *parent)
 {
-	/*xmlnode *child = parent->child;
-	int count = 0;
-
-	if (!child)
-		return 0;
-
-	while ((child = child->next) != NULL) {
-		if (child->name)
-			count++;
-	}*/
 	int count = 0;
 	xmlnode *child;
 	if (parent == NULL)
