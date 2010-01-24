@@ -84,10 +84,6 @@ struct _TwitterMultiPageRequestData
 typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(PurpleAccount *account, GList *nodes, gpointer user_data);
 typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
-void twitter_send_request(PurpleAccount *account, gboolean post,
-		const char *url, const char *query_string,
-		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
-		gpointer data);
 void twitter_send_request_params(PurpleAccount *account, gboolean post,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
@@ -103,7 +99,7 @@ void twitter_send_request_multipage_all_params(PurpleAccount *account,
 /* statuses/friends API deprecated page based retrieval,
  * and use cursor based method instead */
 void twitter_send_request_with_cursor (PurpleAccount *account,
-       const char *url, const char *query_string, long long cursor,
+       const char *url, const TwitterRequestParams *params, long long cursor,
        TwitterSendRequestMultiPageAllSuccessFunc success_callback,
        TwitterSendRequestMultiPageAllErrorFunc error_callback,
        gpointer data);

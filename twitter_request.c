@@ -65,7 +65,7 @@ typedef struct {
 	GList *nodes;
 	long long next_cursor;
 	gchar *url;
-	gchar *query_string;
+	TwitterRequestParams *params;
 
 	TwitterSendRequestMultiPageAllSuccessFunc success_callback;
 	TwitterSendRequestMultiPageAllErrorFunc error_callback;
@@ -137,7 +137,7 @@ void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_dat
 }
 
 
-void twitter_send_request(PurpleAccount *account, gboolean post,
+static void twitter_send_request_querystring(PurpleAccount *account, gboolean post,
 		const char *url, const char *query_string,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
@@ -212,7 +212,7 @@ TwitterRequestParam *twitter_request_param_new_ll(const gchar *name, long long v
 	p->value = g_strdup_printf("%lld", value);
 	return p;
 }
-TwitterRequestParam *twitter_request_param_clone(TwitterRequestParam *p)
+static TwitterRequestParam *twitter_request_param_clone(const TwitterRequestParam *p)
 {
 	if (p == NULL)
 		return NULL;
@@ -227,7 +227,7 @@ TwitterRequestParams *twitter_request_params_add(TwitterRequestParams *params, T
 {
 	return g_array_append_val(params, p);
 }
-TwitterRequestParams *twitter_request_params_clone(TwitterRequestParams *params)
+static TwitterRequestParams *twitter_request_params_clone(const TwitterRequestParams *params)
 {
 	int i;
 	TwitterRequestParams *clone;
@@ -265,7 +265,7 @@ void twitter_request_param_free(TwitterRequestParam *p)
 	g_free(p);
 }
 
-static gchar *twitter_request_params_to_string(TwitterRequestParams *params)
+static gchar *twitter_request_params_to_string(const TwitterRequestParams *params)
 {
 	TwitterRequestParam *p;
 	GString *rv;
@@ -295,7 +295,7 @@ void twitter_send_request_params(PurpleAccount *account, gboolean post,
 		gpointer data)
 {
 	gchar *query_string = twitter_request_params_to_string(params);
-	twitter_send_request(account, post,
+	twitter_send_request_querystring(account, post,
 			url, query_string,
 			success_callback, error_callback,
 			data);
@@ -377,15 +377,9 @@ void twitter_send_request_multipage_error_cb(PurpleAccount *account, const Twitt
 void twitter_send_request_multipage_do(PurpleAccount *account,
 		TwitterMultiPageRequestData *request_data)
 {
-	//gchar *query_string = twitter_request_params_to_string(request_data->params);
 	int len = request_data->params->len;
 	twitter_request_params_add(request_data->params, twitter_request_param_new_int("page", request_data->page));
 	twitter_request_params_add(request_data->params, twitter_request_param_new_int("count", request_data->expected_count));
-	/*char *full_query_string = g_strdup_printf("%s%spage=%d&count=%d",
-			query_string ? query_string : "",
-			query_string && query_string[0] != '\0' ? "&" : "",
-			request_data->page,
-			request_data->expected_count);*/
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s: page: %d\n", G_STRFUNC, request_data->page);
 
@@ -393,8 +387,6 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 			request_data->url, request_data->params,
 			twitter_send_request_multipage_cb, twitter_send_request_multipage_error_cb,
 			request_data);
-	//g_free(query_string);
-	//g_free(full_query_string);
 	twitter_request_params_set_size(request_data->params, len);
 }
 
@@ -501,7 +493,7 @@ static void twitter_request_with_cursor_data_free (
 		xmlnode_free (l->data);
 	g_list_free (request_data->nodes);
 	g_free (request_data->url);
-	g_free (request_data->query_string);
+	twitter_request_params_free(request_data->params);
 	g_slice_free (TwitterRequestWithCursorData, request_data);
 }
 
@@ -536,23 +528,17 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 	}
 
 	if (request_data->next_cursor) {
-		gchar *full_query_string;
+		int len = request_data->params->len;
+		twitter_request_params_add(request_data->params,
+				twitter_request_param_new_ll("cursor", request_data->next_cursor));
 
-		if (request_data->query_string)
-			full_query_string = g_strdup_printf ("%s&cursor=%lld",
-					request_data->query_string,
-					request_data->next_cursor);
-		else
-			full_query_string = g_strdup_printf ("cursor=%lld",
-					request_data->next_cursor);
-
-		twitter_send_request (account, FALSE,
-				request_data->url, full_query_string,
+		twitter_send_request_params(account, FALSE,
+				request_data->url, request_data->params,
 				twitter_send_request_with_cursor_cb,
 				NULL,
 				request_data);
 
-		g_free (full_query_string);
+		twitter_request_params_set_size(request_data->params, len);
 	}
 	else {
 		request_data->success_callback (account,
@@ -563,31 +549,31 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 }
 
 void twitter_send_request_with_cursor (PurpleAccount *account,
-		const char *url, const char *query_string, long long cursor,
+		const char *url, const TwitterRequestParams *params, long long cursor,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
 		gpointer data)
 {
-	gchar *full_query_string;
-
-	if (query_string)
-		full_query_string = g_strdup_printf ("%s&cursor=%lld",
-				query_string, cursor);
-	else
-		full_query_string = g_strdup_printf ("cursor=%lld", cursor);
+	int len;
 
 	TwitterRequestWithCursorData *request_data = g_slice_new0 (TwitterRequestWithCursorData);
 	request_data->url = g_strdup (url);
-	request_data->query_string = g_strdup (query_string);
+	request_data->params = twitter_request_params_clone(params);
+	if (!request_data->params)
+		request_data->params = twitter_request_params_new();
 	request_data->success_callback = success_callback;
 	request_data->error_callback = error_callback;
 	request_data->user_data = data;
 
-	twitter_send_request (account, FALSE,
-			url, full_query_string,
+	len = request_data->params->len;
+	twitter_request_params_add(request_data->params,
+			twitter_request_param_new_ll("cursor", cursor));
+
+	twitter_send_request_params(account, FALSE,
+			url, request_data->params,
 			twitter_send_request_with_cursor_cb,
 			NULL,
 			request_data);
 
-	g_free (full_query_string);
+	twitter_request_params_set_size(request_data->params, len);
 }
