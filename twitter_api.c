@@ -205,19 +205,17 @@ void twitter_api_set_status(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
-	if (msg != NULL && strcmp("", msg))
-	{
-		char *query = in_reply_to_status_id ?
-			g_strdup_printf ("status=%s&in_reply_to_status_id=%lld",
-					purple_url_encode(msg), in_reply_to_status_id) :
-			g_strdup_printf("status=%s", purple_url_encode(msg));
-		twitter_send_request(account, TRUE,
-				twitter_option_url_update_status(account), query,
-				success_func, error_func, data);
-		g_free(query);
-	} else {
-		//SEND error?
-	}
+	TwitterRequestParams *params;
+	g_return_if_fail(msg != NULL && msg[0] != '\0');
+
+	params = twitter_request_params_new();
+	twitter_request_params_add(params, twitter_request_param_new("status", msg));
+	if (in_reply_to_status_id)
+		twitter_request_params_add(params, twitter_request_param_new_ll("in_reply_to_status_id", in_reply_to_status_id));
+	twitter_send_request_params(account, TRUE,
+			twitter_option_url_update_status(account), params,
+			success_func, error_func, data);
+	twitter_request_params_free(params);
 }
 
 typedef struct
@@ -315,19 +313,17 @@ void twitter_api_send_dm(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
-	if (msg != NULL && strcmp("", msg) && user != NULL && strcmp("", user))
-	{
-		char *user_encoded = g_strdup(purple_url_encode(user));
-		char *query = g_strdup_printf ("text=%s&user=%s",
-				purple_url_encode(msg), user_encoded);
-		twitter_send_request(account, TRUE,
-				twitter_option_url_new_dm(account), query,
-				success_func, error_func, data);
-		g_free(user_encoded);
-		g_free(query);
-	} else {
-		//SEND error?
-	}
+	TwitterRequestParams *params;
+	g_return_if_fail(msg != NULL && user != NULL && msg[0] != '\0' && user[0] != '\0');
+
+	params = twitter_request_params_new();
+	twitter_request_params_add(params, twitter_request_param_new("text", msg));
+	twitter_request_params_add(params, twitter_request_param_new("user", user));
+	twitter_send_request_params(account, TRUE,
+			twitter_option_url_new_dm(account), params,
+			success_func, error_func, data);
+	twitter_request_params_free(params);
+
 }
 
 static void twitter_api_send_dms_success_cb(PurpleAccount *account, xmlnode *node, gpointer _ctx);
