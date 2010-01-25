@@ -84,13 +84,13 @@ struct _TwitterMultiPageRequestData
 typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(PurpleAccount *account, GList *nodes, gpointer user_data);
 typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
-void twitter_send_request_params(PurpleAccount *account, gboolean post,
+void twitter_send_request(PurpleAccount *account, gboolean post,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data);
 
 //don't include count in the query_string
-void twitter_send_request_multipage_all_params(PurpleAccount *account,
+void twitter_send_request_multipage_all(PurpleAccount *account,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,

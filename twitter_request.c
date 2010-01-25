@@ -289,7 +289,7 @@ static gchar *twitter_request_params_to_string(const TwitterRequestParams *param
 
 }
 
-void twitter_send_request_params(PurpleAccount *account, gboolean post,
+void twitter_send_request(PurpleAccount *account, gboolean post,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
@@ -383,7 +383,7 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s: page: %d\n", G_STRFUNC, request_data->page);
 
-	twitter_send_request_params(account, FALSE,
+	twitter_send_request(account, FALSE,
 			request_data->url, request_data->params,
 			twitter_send_request_multipage_cb, twitter_send_request_multipage_error_cb,
 			request_data);
@@ -391,7 +391,7 @@ void twitter_send_request_multipage_do(PurpleAccount *account,
 }
 
 
-void twitter_send_request_multipage_params(PurpleAccount *account,
+void twitter_send_request_multipage(PurpleAccount *account,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageSuccessFunc success_callback,
 		TwitterSendRequestMultiPageErrorFunc error_callback,
@@ -454,7 +454,7 @@ static gboolean twitter_send_request_multipage_all_error_cb(PurpleAccount *accou
 	return FALSE;
 }
 
-void twitter_send_request_multipage_all_params(PurpleAccount *account,
+void twitter_send_request_multipage_all(PurpleAccount *account,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
@@ -470,7 +470,7 @@ void twitter_send_request_multipage_all_params(PurpleAccount *account,
 	if (max_count > 0 && expected_count > max_count)
 		expected_count = max_count;
 
-	twitter_send_request_multipage_params(account,
+	twitter_send_request_multipage(account,
 			url,
 			params,
 			twitter_send_request_multipage_all_success_cb,
@@ -532,7 +532,7 @@ static void twitter_send_request_with_cursor_cb (PurpleAccount *account,
 		twitter_request_params_add(request_data->params,
 				twitter_request_param_new_ll("cursor", request_data->next_cursor));
 
-		twitter_send_request_params(account, FALSE,
+		twitter_send_request(account, FALSE,
 				request_data->url, request_data->params,
 				twitter_send_request_with_cursor_cb,
 				NULL,
@@ -569,7 +569,7 @@ void twitter_send_request_with_cursor (PurpleAccount *account,
 	twitter_request_params_add(request_data->params,
 			twitter_request_param_new_ll("cursor", cursor));
 
-	twitter_send_request_params(account, FALSE,
+	twitter_send_request(account, FALSE,
 			url, request_data->params,
 			twitter_send_request_with_cursor_cb,
 			NULL,
