@@ -85,6 +85,15 @@ struct _TwitterMultiPageRequestData
 typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(PurpleAccount *account, GList *nodes, gpointer user_data);
 typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
+void twitter_send_request(PurpleAccount *account,
+		gboolean post,
+		const char *url,
+		const TwitterRequestParams *params,
+		gboolean auth_basic,
+		TwitterSendRequestSuccessFunc success_callback,
+		TwitterSendRequestErrorFunc error_callback,
+		gpointer data);
+
 void twitter_send_xml_request(PurpleAccount *account, gboolean post,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,

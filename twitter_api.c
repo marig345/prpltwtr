@@ -474,12 +474,36 @@ void twitter_api_search_refresh(PurpleAccount *account,
 	twitter_request_params_free(params);
 }
 
-void twitter_api_oauth_request_token(PurpleAccount *account)
+void twitter_api_oauth_request_token(PurpleAccount *account,
+		TwitterSendRequestSuccessFunc success_cb,
+		TwitterSendRequestErrorFunc error_cb,
+		gpointer user_data)
 {
-	//Right now does absolutely nothing
-	twitter_send_request_oauth(account, FALSE,
-			"twitter.com/oauth/request_token", NULL,
-			NULL, TWITTER_OAUTH_SECRET "&",
-			NULL, NULL,
-			NULL);
+	twitter_send_request(account,
+			FALSE,
+			"twitter.com/oauth/request_token",
+			NULL,
+			FALSE,
+			success_cb,
+			error_cb,
+			user_data);
+}
+
+void twitter_api_oauth_access_token(PurpleAccount *account,
+		const gchar *oauth_verifier,
+		TwitterSendRequestSuccessFunc success_cb,
+		TwitterSendRequestErrorFunc error_cb,
+		gpointer user_data)
+{
+	TwitterRequestParams *params = twitter_request_params_new();
+	twitter_request_params_add(params, twitter_request_param_new("oauth_verifier", oauth_verifier));
+	twitter_send_request(account,
+			FALSE,
+			"twitter.com/oauth/access_token",
+			params,
+			FALSE,
+			success_cb,
+			error_cb,
+			user_data);
+	twitter_request_params_free(params);
 }

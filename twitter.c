@@ -741,6 +741,13 @@ static void twitter_verify_connection(PurpleAccount *account)
 	}
 }
 
+/*static void twitter_send_request_debug(PurpleAccount *account,
+		const gchar *response,
+		gpointer user_data)
+{
+	purple_debug_info(TWITTER_PROTOCOL_ID, "twitter_send_request_debug: %s\n", response);
+}*/
+
 static void twitter_login(PurpleAccount *account)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
@@ -763,6 +770,27 @@ static void twitter_login(PurpleAccount *account)
 			0,   /* which connection step this is */
 			2);  /* total number of steps */
 
+	/*twitter_api_oauth_request_token(account,
+			twitter_send_request_debug,
+			NULL,
+			NULL);*/
+
+	/*
+	twitter->oauth_token = g_strdup("requesttoken123");
+	twitter->oauth_token_secret = g_strdup("requesttokensecret123");
+
+	twitter_api_oauth_access_token(account,
+			"pin123",
+			twitter_send_request_debug,
+			NULL,
+			NULL);
+	*/
+
+	/*
+	//TODO: free previous
+	twitter->oauth_token = g_strdup("accesstoken123");
+	twitter->oauth_token_secret = g_strdup("accesstokensecret123");
+	*/
 
 	twitter_verify_connection(account);
 }
@@ -789,6 +817,12 @@ static void twitter_close(PurpleConnection *gc)
 	if (twitter->user_reply_id_table)
 		g_hash_table_destroy (twitter->user_reply_id_table);
 	twitter->user_reply_id_table = NULL;
+
+	if (twitter->oauth_token)
+		g_free(twitter->oauth_token);
+
+	if (twitter->oauth_token_secret)
+		g_free(twitter->oauth_token_secret);
 
 
 	g_free(twitter);

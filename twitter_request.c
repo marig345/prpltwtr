@@ -87,166 +87,10 @@ static void twitter_send_xml_request_with_cursor_cb (PurpleAccount *account,
 		xmlnode *node,
 		gpointer user_data);
 
-void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_data,
-		const gchar *url_text, gsize len,
-		const gchar *server_error_message)
-{
-	TwitterSendRequestData *request_data = user_data;
-	const gchar *error_message = NULL;
-	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
-
-	if (server_error_message)
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: %s\n", server_error_message);
-		error_type = TWITTER_REQUEST_ERROR_SERVER;
-		error_message = server_error_message;
-	}
-
-	if (error_type != TWITTER_REQUEST_ERROR_NONE)
-	{
-		TwitterRequestErrorData *error_data = g_new0(TwitterRequestErrorData, 1);
-		error_data->type = error_type;
-		error_data->message = error_message;
-		if (request_data->error_func)
-			request_data->error_func(request_data->account, error_data, request_data->user_data);
-
-		g_free(error_data);
-	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
-		if (request_data->success_func)
-			request_data->success_func(request_data->account, url_text, request_data->user_data);
-	}
-
-	g_free(request_data);
-}
-
-static void twitter_send_request_querystring(PurpleAccount *account,
-		gboolean post,
-		const char *url, const char *query_string,
-		gboolean auth_basic,
-		TwitterSendRequestSuccessFunc success_callback,
-		TwitterSendRequestErrorFunc error_callback,
-		gpointer data)
-{
-	gchar *request;
-	const char *pass = purple_connection_get_password(purple_account_get_connection(account));
-	const char *sn = purple_account_get_username(account);
-	char *auth_text = g_strdup_printf("%s:%s", sn, pass);
-	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
-	gboolean use_https = twitter_option_use_https(account) && purple_ssl_is_supported();
-	char *slash = strchr(url, '/');
-	TwitterSendRequestData *request_data = g_new0(TwitterSendRequestData, 1);
-	char *host = slash ? g_strndup(url, slash - url) : g_strdup(url);
-	char *full_url = g_strdup_printf("%s://%s",
-			use_https ? "https" : "http",
-			url);
-	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s ? %s\n",
-			full_url,
-			query_string ? query_string : "");
-
-	request_data->account = account;
-	request_data->user_data = data;
-	request_data->success_func = success_callback;
-	request_data->error_func = error_callback;
-
-	g_free(auth_text);
-
-	request = g_strdup_printf(
-			"%s %s%s%s HTTP/1.1\r\n"
-			"User-Agent: " USER_AGENT "\r\n"
-			"Host: %s\r\n"
-			"%s%s%s" //Authorization if auth_basic
-			"%s" //Content-Type if post
-			"Content-Length: %lu\r\n\r\n"
-			"%s",
-			post ? "POST" : "GET",
-			full_url,
-			(!post && query_string ? "?" : ""), (!post && query_string ? query_string : ""),
-			host,
-			auth_basic ? "Authorization: Basic " : "",
-			auth_basic ? auth_text_b64 : "",
-			auth_basic ? "\r\n" : "",
-			post ? "Content-Type: application/x-www-form-urlencoded\r\n" : "",
-			query_string && post ? strlen(query_string) : 0,
-			query_string && post ? query_string : "");
-
-	g_free(auth_text_b64);
-	purple_util_fetch_url_request(full_url, TRUE,
-			USER_AGENT, TRUE, request, FALSE,
-			twitter_send_request_cb, request_data);
-	g_free(full_url);
-	g_free(request);
-	g_free(host);
-}
-
-void twitter_xml_request_success_cb(PurpleAccount *account, const gchar *response, gpointer user_data)
-{
-	TwitterSendXmlRequestData *request_data = user_data;
-	const gchar *error_message = NULL;
-	gchar *error_node_text = NULL;
-	xmlnode *response_node = NULL;
-	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
-
-	response_node = xmlnode_from_str(response, strlen(response));
-	if (!response_node)
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: invalid xml\n");
-		error_type = TWITTER_REQUEST_ERROR_INVALID_XML;
-		error_message = response;
-	} else {
-		xmlnode *error_node;
-		if ((error_node = xmlnode_get_child(response_node, "error")) != NULL)
-		{
-			error_type = TWITTER_REQUEST_ERROR_TWITTER_GENERAL;
-			error_node_text = xmlnode_get_data(error_node);
-			error_message = error_node_text;
-			purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: Twitter error %s\n", error_message);
-		}
-	}
-
-	if (error_type != TWITTER_REQUEST_ERROR_NONE)
-	{
-		TwitterRequestErrorData *error_data = g_new0(TwitterRequestErrorData, 1);
-		error_data->type = error_type;
-		error_data->message = error_message;
-		if (request_data->error_func)
-			request_data->error_func(request_data->account, error_data, request_data->user_data);
-
-		g_free(error_data);
-	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
-		if (request_data->success_func)
-			request_data->success_func(request_data->account, response_node, request_data->user_data);
-	}
-
-	if (response_node != NULL)
-		xmlnode_free(response_node);
-	if (error_node_text != NULL)
-		g_free(error_node_text);
-	g_free(request_data);
-}
-
-void twitter_xml_request_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
-{
-	TwitterSendXmlRequestData *request_data = user_data;
-	if (request_data->error_func)
-		request_data->error_func(request_data->account, error_data, request_data->user_data);
-	g_free(request_data);
-}
-
-static void twitter_send_xml_request_querystring(PurpleAccount *account, gboolean post,
-		const char *url, const char *query_string,
-		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
-		gpointer data)
-{
-	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
-	request_data->account = account;
-	request_data->user_data = data;
-	request_data->success_func = success_callback;
-	request_data->error_func = error_callback;
-	twitter_send_request_querystring(account, post, url, query_string, TRUE,
-			twitter_xml_request_success_cb, twitter_xml_request_error_cb, request_data);
-}
+static TwitterRequestParams *twitter_request_params_add_oauth_params(PurpleAccount *account,
+		gboolean post, const gchar *url,
+		const TwitterRequestParams *params,
+		const gchar *token, const gchar *signing_key);
 
 TwitterRequestParam *twitter_request_param_new(const gchar *name, const gchar *value)
 {
@@ -346,17 +190,207 @@ static gchar *twitter_request_params_to_string(const TwitterRequestParams *param
 
 }
 
+
+static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_data,
+		const gchar *url_text, gsize len,
+		const gchar *server_error_message)
+{
+	TwitterSendRequestData *request_data = user_data;
+	const gchar *error_message = NULL;
+	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
+
+	if (server_error_message)
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: %s\n", server_error_message);
+		error_type = TWITTER_REQUEST_ERROR_SERVER;
+		error_message = server_error_message;
+	}
+
+	if (error_type != TWITTER_REQUEST_ERROR_NONE)
+	{
+		TwitterRequestErrorData *error_data = g_new0(TwitterRequestErrorData, 1);
+		error_data->type = error_type;
+		error_data->message = error_message;
+		if (request_data->error_func)
+			request_data->error_func(request_data->account, error_data, request_data->user_data);
+
+		g_free(error_data);
+	} else {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
+		if (request_data->success_func)
+			request_data->success_func(request_data->account, url_text, request_data->user_data);
+	}
+
+	g_free(request_data);
+}
+
+static void twitter_send_request_querystring(PurpleAccount *account,
+		gboolean post,
+		const char *url, const char *query_string,
+		gboolean auth_basic,
+		TwitterSendRequestSuccessFunc success_callback,
+		TwitterSendRequestErrorFunc error_callback,
+		gpointer data)
+{
+	gchar *request;
+	const char *pass = purple_connection_get_password(purple_account_get_connection(account));
+	const char *sn = purple_account_get_username(account);
+	char *auth_text = g_strdup_printf("%s:%s", sn, pass);
+	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
+	gboolean use_https = twitter_option_use_https(account) && purple_ssl_is_supported();
+	char *slash = strchr(url, '/');
+	TwitterSendRequestData *request_data = g_new0(TwitterSendRequestData, 1);
+	char *host = slash ? g_strndup(url, slash - url) : g_strdup(url);
+	char *full_url = g_strdup_printf("%s://%s",
+			use_https ? "https" : "http",
+			url);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s ? %s\n",
+			full_url,
+			query_string ? query_string : "");
+
+	request_data->account = account;
+	request_data->user_data = data;
+	request_data->success_func = success_callback;
+	request_data->error_func = error_callback;
+
+	g_free(auth_text);
+
+	request = g_strdup_printf(
+			"%s %s%s%s HTTP/1.1\r\n"
+			"User-Agent: " USER_AGENT "\r\n"
+			"Host: %s\r\n"
+			"%s%s%s" //Authorization if auth_basic
+			"%s" //Content-Type if post
+			"Content-Length: %lu\r\n\r\n"
+			"%s",
+			post ? "POST" : "GET",
+			full_url,
+			(!post && query_string ? "?" : ""), (!post && query_string ? query_string : ""),
+			host,
+			auth_basic ? "Authorization: Basic " : "",
+			auth_basic ? auth_text_b64 : "",
+			auth_basic ? "\r\n" : "",
+			post ? "Content-Type: application/x-www-form-urlencoded\r\n" : "",
+			query_string && post ? strlen(query_string) : 0,
+			query_string && post ? query_string : "");
+
+	g_free(auth_text_b64);
+	purple_util_fetch_url_request(full_url, TRUE,
+			USER_AGENT, TRUE, request, FALSE,
+			twitter_send_request_cb, request_data);
+	g_free(full_url);
+	g_free(request);
+	g_free(host);
+}
+
+void twitter_send_request(PurpleAccount *account,
+		gboolean post,
+		const char *url,
+		const TwitterRequestParams *params,
+		gboolean auth_basic,
+		TwitterSendRequestSuccessFunc success_callback,
+		TwitterSendRequestErrorFunc error_callback,
+		gpointer data)
+{
+	gchar *querystring;
+	if (!auth_basic)
+	{
+		PurpleConnection *gc = purple_account_get_connection(account);
+		TwitterConnectionData *twitter = gc->proto_data;
+		gchar *signing_key = g_strdup_printf("%s&%s",
+				TWITTER_OAUTH_SECRET,
+				twitter->oauth_token_secret ? twitter->oauth_token_secret : "");
+		TwitterRequestParams *oauth_params = twitter_request_params_add_oauth_params(
+			account, post, url,
+			params, twitter->oauth_token, signing_key);
+
+		querystring = twitter_request_params_to_string(oauth_params);
+
+		twitter_request_params_free(oauth_params);
+		g_free(signing_key);
+	} else {
+		querystring = twitter_request_params_to_string(params);
+	}
+	twitter_send_request_querystring(account,
+			post,
+			url, querystring,
+			auth_basic,
+			success_callback,
+			error_callback,
+			data);
+
+	g_free(querystring);
+}
+
+static void twitter_xml_request_success_cb(PurpleAccount *account, const gchar *response, gpointer user_data)
+{
+	TwitterSendXmlRequestData *request_data = user_data;
+	const gchar *error_message = NULL;
+	gchar *error_node_text = NULL;
+	xmlnode *response_node = NULL;
+	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
+
+	response_node = xmlnode_from_str(response, strlen(response));
+	if (!response_node)
+	{
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: invalid xml\n");
+		error_type = TWITTER_REQUEST_ERROR_INVALID_XML;
+		error_message = response;
+	} else {
+		xmlnode *error_node;
+		if ((error_node = xmlnode_get_child(response_node, "error")) != NULL)
+		{
+			error_type = TWITTER_REQUEST_ERROR_TWITTER_GENERAL;
+			error_node_text = xmlnode_get_data(error_node);
+			error_message = error_node_text;
+			purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: Twitter error %s\n", error_message);
+		}
+	}
+
+	if (error_type != TWITTER_REQUEST_ERROR_NONE)
+	{
+		TwitterRequestErrorData *error_data = g_new0(TwitterRequestErrorData, 1);
+		error_data->type = error_type;
+		error_data->message = error_message;
+		if (request_data->error_func)
+			request_data->error_func(request_data->account, error_data, request_data->user_data);
+
+		g_free(error_data);
+	} else {
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
+		if (request_data->success_func)
+			request_data->success_func(request_data->account, response_node, request_data->user_data);
+	}
+
+	if (response_node != NULL)
+		xmlnode_free(response_node);
+	if (error_node_text != NULL)
+		g_free(error_node_text);
+	g_free(request_data);
+}
+
+static void twitter_xml_request_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+{
+	TwitterSendXmlRequestData *request_data = user_data;
+	if (request_data->error_func)
+		request_data->error_func(request_data->account, error_data, request_data->user_data);
+	g_free(request_data);
+}
+
 void twitter_send_xml_request(PurpleAccount *account, gboolean post,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
-	gchar *query_string = twitter_request_params_to_string(params);
-	twitter_send_xml_request_querystring(account, post,
-			url, query_string,
-			success_callback, error_callback,
-			data);
-	g_free(query_string);
+
+	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
+	request_data->account = account;
+	request_data->user_data = data;
+	request_data->success_func = success_callback;
+	request_data->error_func = error_callback;
+
+	twitter_send_request(account, post, url, params, TRUE,
+			twitter_xml_request_success_cb, twitter_xml_request_error_cb, request_data);
 }
 
 static long long twitter_oauth_generate_nonce()
@@ -410,6 +444,33 @@ static gchar *twitter_oauth_sign(const gchar *txt, const gchar *key)
 	purple_cipher_context_destroy(ctx);
 	return purple_base64_encode(output, output_size);
 
+}
+
+TwitterRequestParams *twitter_request_params_add_oauth_params(PurpleAccount *account,
+		gboolean post, const gchar *url,
+		const TwitterRequestParams *params,
+		const gchar *token, const gchar *signing_key)
+{
+	gboolean use_https = twitter_option_use_https(account) && purple_ssl_is_supported();
+	TwitterRequestParams *oauth_params = twitter_request_params_clone(params);
+	gchar *signme;
+	gchar *signature;
+	if (oauth_params == NULL)
+		oauth_params = twitter_request_params_new();
+
+	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_consumer_key", TWITTER_OAUTH_KEY));
+	twitter_request_params_add(oauth_params, twitter_request_param_new_ll("oauth_nonce", twitter_oauth_generate_nonce()));
+	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_signature_method","HMAC-SHA1"));
+	twitter_request_params_add(oauth_params, twitter_request_param_new_ll("oauth_timestamp", time(NULL)));
+	if (token)
+		twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_token", token));
+
+	g_array_sort(oauth_params, (GCompareFunc) twitter_request_params_sort_do);
+	signme = twitter_oauth_get_text_to_sign(post, use_https, url, oauth_params);
+	signature = twitter_oauth_sign(signme, signing_key);
+
+	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_signature", signature));
+	return oauth_params;
 }
 
 void twitter_send_request_oauth(PurpleAccount *account, gboolean post,
