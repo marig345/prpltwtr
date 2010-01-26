@@ -741,6 +741,69 @@ static void twitter_verify_connection(PurpleAccount *account)
 	}
 }
 
+static GHashTable *twitter_oauth_result_to_hashtable(const gchar *txt)
+{
+	gchar **pieces = g_strsplit(txt, "&", 0);
+	GHashTable *results = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+	gchar **p;
+	
+	for (p = pieces; *p; p++)
+	{
+		gchar *equalpos = strchr(*p, '=');
+		if (equalpos)
+		{
+			equalpos[0] = '\0';
+			g_hash_table_replace(results, g_strdup(*p), g_strdup(equalpos+1));
+		}
+	}
+	g_strfreev(pieces);
+	return results;
+}
+
+static void twitter_oauth_request_pin_ok(PurpleAccount *account, const gchar *pin)
+{
+	//TODO
+}
+
+static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
+		const gchar *response,
+		gpointer user_data)
+{
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
+
+	GHashTable *results = twitter_oauth_result_to_hashtable(response);
+	gchar *oauth_token = g_hash_table_lookup(results, "oauth_token");
+	gchar *oauth_token_secret = g_hash_table_lookup(results, "oauth_token_secret");
+	if (oauth_token && oauth_token_secret)
+	{
+		gchar *msg = g_strdup_printf("http://twitter.com/oauth/authorize?oauth_token=%s",
+			purple_url_encode(oauth_token));
+
+		purple_notify_uri(twitter, msg);
+
+		purple_request_input(twitter,
+				"OAuth Authentication", //title
+				"Please enter pin", //primary
+				msg, //secondary
+				NULL, //default
+				FALSE, //multiline,
+				FALSE, //password
+				NULL, //hint
+				"Submit", //ok text
+				G_CALLBACK(twitter_oauth_request_pin_ok),
+				"Cancel",
+				NULL, //cancel cb TODO
+				account,
+				NULL,
+				NULL,
+				account);
+		g_free(msg);
+	} else {
+		//TODO: ERROR
+	}
+	g_hash_table_destroy(results);
+}
 /*static void twitter_send_request_debug(PurpleAccount *account,
 		const gchar *response,
 		gpointer user_data)
@@ -770,10 +833,12 @@ static void twitter_login(PurpleAccount *account)
 			0,   /* which connection step this is */
 			2);  /* total number of steps */
 
-	/*twitter_api_oauth_request_token(account,
-			twitter_send_request_debug,
+	/*
+	twitter_api_oauth_request_token(account,
+			twitter_oauth_request_token_success_cb,
 			NULL,
-			NULL);*/
+			NULL);
+	*/
 
 	/*
 	twitter->oauth_token = g_strdup("requesttoken123");
