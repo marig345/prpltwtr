@@ -759,10 +759,44 @@ static GHashTable *twitter_oauth_result_to_hashtable(const gchar *txt)
 	g_strfreev(pieces);
 	return results;
 }
+static void twitter_send_request_debug(PurpleAccount *account,
+		const gchar *response,
+		gpointer user_data)
+{
+	purple_debug_info(TWITTER_PROTOCOL_ID, "twitter_send_request_debug: %s\n", response);
+}
+
+static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
+		const gchar *response,
+		gpointer user_data)
+{
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
+
+	GHashTable *results = twitter_oauth_result_to_hashtable(response);
+	const gchar *oauth_token = g_hash_table_lookup(results, "oauth_token");
+	const gchar *oauth_token_secret = g_hash_table_lookup(results, "oauth_token_secret");
+	if (oauth_token && oauth_token_secret)
+	{
+		g_free(twitter->oauth_token);
+		g_free(twitter->oauth_token_secret);
+
+		twitter->oauth_token = g_strdup(oauth_token);
+		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
+
+		twitter_verify_connection(account);
+	} else {
+		//TODO: fail
+	}
+}
 
 static void twitter_oauth_request_pin_ok(PurpleAccount *account, const gchar *pin)
 {
-	//TODO
+	twitter_api_oauth_access_token(account,
+			pin,
+			twitter_oauth_access_token_success_cb,
+			NULL,
+			NULL);
 }
 
 static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
@@ -773,13 +807,15 @@ static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
 	TwitterConnectionData *twitter = gc->proto_data;
 
 	GHashTable *results = twitter_oauth_result_to_hashtable(response);
-	gchar *oauth_token = g_hash_table_lookup(results, "oauth_token");
-	gchar *oauth_token_secret = g_hash_table_lookup(results, "oauth_token_secret");
+	const gchar *oauth_token = g_hash_table_lookup(results, "oauth_token");
+	const gchar *oauth_token_secret = g_hash_table_lookup(results, "oauth_token_secret");
 	if (oauth_token && oauth_token_secret)
 	{
 		gchar *msg = g_strdup_printf("http://twitter.com/oauth/authorize?oauth_token=%s",
 			purple_url_encode(oauth_token));
 
+		twitter->oauth_token = g_strdup(oauth_token);
+		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
 		purple_notify_uri(twitter, msg);
 
 		purple_request_input(twitter,
@@ -804,12 +840,6 @@ static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
 	}
 	g_hash_table_destroy(results);
 }
-/*static void twitter_send_request_debug(PurpleAccount *account,
-		const gchar *response,
-		gpointer user_data)
-{
-	purple_debug_info(TWITTER_PROTOCOL_ID, "twitter_send_request_debug: %s\n", response);
-}*/
 
 static void twitter_login(PurpleAccount *account)
 {
@@ -838,23 +868,8 @@ static void twitter_login(PurpleAccount *account)
 			twitter_oauth_request_token_success_cb,
 			NULL,
 			NULL);
-	*/
 
-	/*
-	twitter->oauth_token = g_strdup("requesttoken123");
-	twitter->oauth_token_secret = g_strdup("requesttokensecret123");
-
-	twitter_api_oauth_access_token(account,
-			"pin123",
-			twitter_send_request_debug,
-			NULL,
-			NULL);
-	*/
-
-	/*
-	//TODO: free previous
-	twitter->oauth_token = g_strdup("accesstoken123");
-	twitter->oauth_token_secret = g_strdup("accesstokensecret123");
+	return;
 	*/
 
 	twitter_verify_connection(account);
