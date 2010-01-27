@@ -189,21 +189,77 @@ static gchar *twitter_request_params_to_string(const TwitterRequestParams *param
 	return g_string_free(rv, FALSE);
 
 }
+static gint twitter_response_text_status_code(const gchar *response_text)
+{
+	const gchar *ptr;
+	const gchar *starts_with = "HTTP/1.";
+	if (response_text == NULL || !g_str_has_prefix(response_text, starts_with))
+	{
+		return 0;
+	}
+	ptr = response_text + strlen(starts_with) + 2; //add the "0 "
 
+	return atoi(ptr);
+}
 
 static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_data,
-		const gchar *url_text, gsize len,
+		const gchar *response_text, gsize len,
 		const gchar *server_error_message)
 {
+	const gchar *url_text;
 	TwitterSendRequestData *request_data = user_data;
 	const gchar *error_message = NULL;
 	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
+	gint status_code = twitter_response_text_status_code(response_text);
+
+	url_text = g_strstr_len(response_text, len, "\r\n\r\n");
+	if (url_text)
+	{
+		url_text += 4;
+	} else {
+		url_text = NULL;
+	}
 
 	if (server_error_message)
 	{
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: %s\n", server_error_message);
 		error_type = TWITTER_REQUEST_ERROR_SERVER;
 		error_message = server_error_message;
+	} else {
+		switch (status_code)
+		{
+			case 200: //OK
+			break;
+			case 304: //Not Modified
+			break;
+			case 400: //Bad Request
+				//TODO
+			break;
+			case 401: //Unauthorized
+				error_type = TWITTER_REQUEST_ERROR_UNAUTHORIZED;
+			break;
+			case 403: //Forbidden
+				//TODO
+			break;
+			case 404: //Not Found
+				//TODO?
+			break;
+			case 406: //Not Acceptable (Search)
+				//TODO
+			break;
+			case 420: //Search Rate Limiting
+				//TODO
+			break;
+			case 500: //Internal Server Error
+				//TODO
+			break;
+			case 502: //Bad Gateway
+				//TODO
+			break;
+			case 504: //Service Unavailable
+				//TODO
+			break;
+		}
 	}
 
 	if (error_type != TWITTER_REQUEST_ERROR_NONE)
@@ -276,7 +332,7 @@ static void twitter_send_request_querystring(PurpleAccount *account,
 
 	g_free(auth_text_b64);
 	purple_util_fetch_url_request(full_url, TRUE,
-			USER_AGENT, TRUE, request, FALSE,
+			USER_AGENT, TRUE, request, TRUE,
 			twitter_send_request_cb, request_data);
 	g_free(full_url);
 	g_free(request);
