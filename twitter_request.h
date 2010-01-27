@@ -99,12 +99,6 @@ void twitter_send_xml_request(PurpleAccount *account, gboolean post,
 		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data);
 
-void twitter_send_request_oauth(PurpleAccount *account, gboolean post,
-		const char *url, const TwitterRequestParams *params,
-		const gchar *token, const gchar *signing_key, /*TODO: move */
-		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
-		gpointer data);
-
 //don't include count in the query_string
 void twitter_send_xml_request_multipage_all(PurpleAccount *account,
 		const char *url, TwitterRequestParams *params,

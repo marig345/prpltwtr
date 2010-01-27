@@ -36,6 +36,23 @@ static PurplePlugin *_twitter_protocol = NULL;
 
 static TwitterEndpointChatSettings *TwitterEndpointChatSettingsLookup[TWITTER_CHAT_UNKNOWN];
 
+static const gchar *twitter_account_get_oauth_access_token(PurpleAccount *account)
+{
+	return purple_account_get_string(account, "oauth_token", NULL);
+}
+static void twitter_account_set_oauth_access_token(PurpleAccount *account, const gchar *oauth_token)
+{
+	purple_account_set_string(account, "oauth_token", oauth_token);
+}
+static const gchar *twitter_account_get_oauth_access_token_secret(PurpleAccount *account)
+{
+	return purple_account_get_string(account, "oauth_token_secret", NULL);
+}
+static void twitter_account_set_oauth_access_token_secret(PurpleAccount *account, const gchar *oauth_token)
+{
+	purple_account_set_string(account, "oauth_token_secret", oauth_token);
+}
+
 /******************************************************
  *  Chat
  ******************************************************/
@@ -784,6 +801,9 @@ static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
 		twitter->oauth_token = g_strdup(oauth_token);
 		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
 
+		twitter_account_set_oauth_access_token(account, oauth_token);
+		twitter_account_set_oauth_access_token_secret(account, oauth_token_secret);
+
 		twitter_verify_connection(account);
 	} else {
 		//TODO: fail
@@ -843,6 +863,8 @@ static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
 
 static void twitter_login(PurpleAccount *account)
 {
+	const gchar *oauth_token;
+	const gchar *oauth_token_secret;
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = g_new0(TwitterConnectionData, 1);
 	gc->proto_data = twitter;
@@ -863,16 +885,24 @@ static void twitter_login(PurpleAccount *account)
 			0,   /* which connection step this is */
 			2);  /* total number of steps */
 
-	/*
-	twitter_api_oauth_request_token(account,
-			twitter_oauth_request_token_success_cb,
-			NULL,
-			NULL);
+
+	oauth_token = twitter_account_get_oauth_access_token(account);
+	oauth_token_secret = twitter_account_get_oauth_access_token_secret(account);
+	if (oauth_token && oauth_token_secret)
+	{
+		twitter->oauth_token = g_strdup(oauth_token);
+		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
+		twitter_verify_connection(account);
+	} else {
+		twitter_api_oauth_request_token(account,
+				twitter_oauth_request_token_success_cb,
+				NULL,
+				NULL);
+	}
 
 	return;
-	*/
 
-	twitter_verify_connection(account);
+	//twitter_verify_connection(account);
 }
 
 static void twitter_endpoint_im_free_foreach(TwitterConnectionData *conn, TwitterEndpointIm *im, gpointer data)

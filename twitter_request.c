@@ -383,14 +383,22 @@ void twitter_send_xml_request(PurpleAccount *account, gboolean post,
 		gpointer data)
 {
 
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
 	request_data->account = account;
 	request_data->user_data = data;
 	request_data->success_func = success_callback;
 	request_data->error_func = error_callback;
 
-	twitter_send_request(account, post, url, params, TRUE,
-			twitter_xml_request_success_cb, twitter_xml_request_error_cb, request_data);
+	twitter_send_request(account,
+			post,
+			url,
+			params,
+			!twitter->oauth_token || !twitter->oauth_token_secret,
+			twitter_xml_request_success_cb,
+			twitter_xml_request_error_cb,
+			request_data);
 }
 
 static long long twitter_oauth_generate_nonce()
@@ -471,47 +479,6 @@ TwitterRequestParams *twitter_request_params_add_oauth_params(PurpleAccount *acc
 
 	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_signature", signature));
 	return oauth_params;
-}
-
-void twitter_send_request_oauth(PurpleAccount *account, gboolean post,
-		const char *url, const TwitterRequestParams *params,
-		const gchar *token, const gchar *signing_key, /*TODO: move */
-		TwitterSendRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
-		gpointer data)
-{
-	gboolean use_https = twitter_option_use_https(account) && purple_ssl_is_supported();
-	TwitterRequestParams *oauth_params = twitter_request_params_clone(params);
-	gchar *signme;
-	gchar *signature;
-	gchar *querystring;
-	if (oauth_params == NULL)
-		oauth_params = twitter_request_params_new();
-
-	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_consumer_key", TWITTER_OAUTH_KEY));
-	twitter_request_params_add(oauth_params, twitter_request_param_new_ll("oauth_nonce", twitter_oauth_generate_nonce()));
-	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_signature_method","HMAC-SHA1"));
-	twitter_request_params_add(oauth_params, twitter_request_param_new_ll("oauth_timestamp", time(NULL)));
-	if (token)
-		twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_token", token));
-
-	g_array_sort(oauth_params, (GCompareFunc) twitter_request_params_sort_do);
-	signme = twitter_oauth_get_text_to_sign(post, use_https, url, oauth_params);
-	signature = twitter_oauth_sign(signme, signing_key);
-
-	twitter_request_params_add(oauth_params, twitter_request_param_new("oauth_signature", signature));
-
-	querystring = twitter_request_params_to_string(oauth_params);
-
-	twitter_send_request_querystring(account, post,
-			url, querystring,
-			FALSE,
-			success_callback, error_callback,
-			data);
-
-	twitter_request_params_free(oauth_params);
-	g_free(querystring);
-	g_free(signme);
-	g_free(signature);
 }
 
 static int xmlnode_child_count(xmlnode *parent)
