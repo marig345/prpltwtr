@@ -785,6 +785,57 @@ static void twitter_oauth_disconnect(PurpleAccount *account, const char *message
 			(message));
 }
 
+typedef struct
+{
+	PurpleAccount *account;
+	gchar *username;
+} TwitterAccountUserNameChange;
+
+static void twitter_account_mismatch_screenname_change_cancel_cb(TwitterAccountUserNameChange *change, gint action_id)
+{
+	PurpleAccount *account = change->account;
+	twitter_account_set_oauth_access_token(account, NULL);
+	twitter_account_set_oauth_access_token_secret(account, NULL);
+	g_free(change->username);
+	g_free(change);
+	twitter_oauth_disconnect(account, "Username mismatch");
+}
+static void twitter_account_mismatch_screenname_change_ok_cb(TwitterAccountUserNameChange *change, gint action_id)
+{
+	PurpleAccount *account = change->account;
+	purple_account_set_username(account, change->username);
+	g_free(change->username);
+	g_free(change);
+	twitter_verify_connection(account);
+}
+
+static void twitter_account_username_change_verify(PurpleAccount *account, const gchar *username)
+{
+	PurpleConnection *gc = purple_account_get_connection(account);
+	gchar *secondary = g_strdup_printf("Do you wish to change the name on this account to %s?",
+			username);
+	TwitterAccountUserNameChange *change_data = (TwitterAccountUserNameChange *) g_new0(TwitterAccountUserNameChange *, 1);
+
+	change_data->account = account;
+	change_data->username = g_strdup(username);
+
+	purple_request_action(gc,
+			"Mismatched Screen Names",
+			"Authorized screen name does not match with account screen name",
+			secondary,
+			0,
+			account,
+			NULL,
+			NULL,
+			change_data,
+			2, 
+			"Cancel", twitter_account_mismatch_screenname_change_cancel_cb,
+			"Yes", twitter_account_mismatch_screenname_change_ok_cb,
+			NULL);
+	
+	g_free(secondary);
+}
+
 static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
 		const gchar *response,
 		gpointer user_data)
@@ -795,10 +846,13 @@ static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
 	GHashTable *results = twitter_oauth_result_to_hashtable(response);
 	const gchar *oauth_token = g_hash_table_lookup(results, "oauth_token");
 	const gchar *oauth_token_secret = g_hash_table_lookup(results, "oauth_token_secret");
+	const gchar *response_screen_name = g_hash_table_lookup(results, "screen_name");
 	if (oauth_token && oauth_token_secret)
 	{
-		g_free(twitter->oauth_token);
-		g_free(twitter->oauth_token_secret);
+		if (twitter->oauth_token)
+			g_free(twitter->oauth_token);
+		if (twitter->oauth_token_secret)
+			g_free(twitter->oauth_token_secret);
 
 		twitter->oauth_token = g_strdup(oauth_token);
 		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
@@ -806,7 +860,13 @@ static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
 		twitter_account_set_oauth_access_token(account, oauth_token);
 		twitter_account_set_oauth_access_token_secret(account, oauth_token_secret);
 
-		twitter_verify_connection(account);
+		//FIXME: set this to be case insensitive
+		if (response_screen_name && strcmp(response_screen_name, purple_account_get_username(account)))
+		{
+			twitter_account_username_change_verify(account, response_screen_name);
+		} else {
+			twitter_verify_connection(account);
+		}
 	} else {
 		twitter_oauth_disconnect(account, "Unknown response getting access token");
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown error receiving access token: %s\n",
