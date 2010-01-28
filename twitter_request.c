@@ -237,6 +237,7 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 			break;
 			case 401: //Unauthorized
 				error_type = TWITTER_REQUEST_ERROR_UNAUTHORIZED;
+				error_message = url_text;
 			break;
 			case 403: //Forbidden
 				//TODO

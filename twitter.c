@@ -776,11 +776,13 @@ static GHashTable *twitter_oauth_result_to_hashtable(const gchar *txt)
 	g_strfreev(pieces);
 	return results;
 }
-static void twitter_send_request_debug(PurpleAccount *account,
-		const gchar *response,
-		gpointer user_data)
+
+static void twitter_oauth_disconnect(PurpleAccount *account, const char *message)
 {
-	purple_debug_info(TWITTER_PROTOCOL_ID, "twitter_send_request_debug: %s\n", response);
+	PurpleConnection *gc = purple_account_get_connection(account);
+	purple_connection_error_reason(gc,
+			PURPLE_CONNECTION_ERROR_AUTHENTICATION_FAILED,
+			(message));
 }
 
 static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
@@ -806,8 +808,15 @@ static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
 
 		twitter_verify_connection(account);
 	} else {
-		//TODO: fail
+		twitter_oauth_disconnect(account, "Unknown response getting access token");
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown error receiving access token: %s\n",
+				response);
 	}
+}
+
+static void twitter_oauth_access_token_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+{
+	twitter_oauth_disconnect(account, "Error verifying PIN");
 }
 
 static void twitter_oauth_request_pin_ok(PurpleAccount *account, const gchar *pin)
@@ -815,8 +824,13 @@ static void twitter_oauth_request_pin_ok(PurpleAccount *account, const gchar *pi
 	twitter_api_oauth_access_token(account,
 			pin,
 			twitter_oauth_access_token_success_cb,
-			NULL,
+			twitter_oauth_access_token_error_cb,
 			NULL);
+}
+
+static void twitter_oauth_request_pin_cancel(PurpleAccount *account, const gchar *pin)
+{
+	twitter_oauth_disconnect(account, "Canceled PIN entry");
 }
 
 static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
@@ -849,16 +863,23 @@ static void twitter_oauth_request_token_success_cb(PurpleAccount *account,
 				"Submit", //ok text
 				G_CALLBACK(twitter_oauth_request_pin_ok),
 				"Cancel",
-				NULL, //cancel cb TODO
+				G_CALLBACK(twitter_oauth_request_pin_cancel),
 				account,
 				NULL,
 				NULL,
 				account);
 		g_free(msg);
 	} else {
-		//TODO: ERROR
+		twitter_oauth_disconnect(account, "Invalid response receiving request token");
+		purple_debug_info(TWITTER_PROTOCOL_ID, "Unknown error receiving request token: %s\n",
+				response);
 	}
 	g_hash_table_destroy(results);
+}
+
+static void twitter_oauth_request_token_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+{
+	twitter_oauth_disconnect(account, "Error receiving request token");
 }
 
 static void twitter_login(PurpleAccount *account)
@@ -896,7 +917,7 @@ static void twitter_login(PurpleAccount *account)
 	} else {
 		twitter_api_oauth_request_token(account,
 				twitter_oauth_request_token_success_cb,
-				NULL,
+				twitter_oauth_request_token_error_cb,
 				NULL);
 	}
 
