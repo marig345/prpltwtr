@@ -507,3 +507,17 @@ void twitter_api_oauth_access_token(PurpleAccount *account,
 			user_data);
 	twitter_request_params_free(params);
 }
+
+void twitter_api_verify_credentials(PurpleAccount *account,
+		TwitterSendXmlRequestSuccessFunc success_cb,
+		TwitterSendRequestErrorFunc error_cb,
+		gpointer user_data)
+{
+	twitter_send_xml_request(account,
+			FALSE,
+			twitter_option_url_verify_credentials(account),
+			NULL,
+			success_cb,
+			error_cb,
+			user_data);
+}

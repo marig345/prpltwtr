@@ -161,6 +161,12 @@ GList *twitter_get_protocol_options()
 			TWITTER_PREF_URL_GET_SEARCH_RESULTS_DEFAULT);
 	options = g_list_append(options, option);
 
+	option = purple_account_option_string_new(
+			("Verify Credentials"),
+			TWITTER_PREF_URL_VERIFY_CREDENTIALS,
+			TWITTER_PREF_URL_VERIFY_CREDENTIALS_DEFAULT);
+	options = g_list_append(options, option);
+
 	return options;
 }
 gboolean twitter_option_add_link_to_tweet(PurpleAccount *account)
@@ -309,5 +315,11 @@ const gchar *twitter_option_url_get_search_results(PurpleAccount *account)
 	return purple_account_get_string(account,
 			TWITTER_PREF_URL_GET_SEARCH_RESULTS,
 			TWITTER_PREF_URL_GET_SEARCH_RESULTS_DEFAULT);
+}
+const gchar *twitter_option_url_verify_credentials(PurpleAccount *account)
+{
+	return purple_account_get_string(account,
+			TWITTER_PREF_URL_VERIFY_CREDENTIALS,
+			TWITTER_PREF_URL_VERIFY_CREDENTIALS_DEFAULT);
 }
 /***** END URLS *****/

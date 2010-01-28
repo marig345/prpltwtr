@@ -84,6 +84,8 @@
 #define TWITTER_PREF_URL_GET_SAVED_SEARCHES_DEFAULT "twitter.com/saved_searches.xml"
 #define TWITTER_PREF_URL_GET_SEARCH_RESULTS "get_search_results_url"
 #define TWITTER_PREF_URL_GET_SEARCH_RESULTS_DEFAULT "search.twitter.com/search.atom"
+#define TWITTER_PREF_URL_VERIFY_CREDENTIALS "verify_credentials_url"
+#define TWITTER_PREF_URL_VERIFY_CREDENTIALS_DEFAULT "twitter.com/account/verify_credentials.xml"
 /***** END URLS *****/
 
 GList *twitter_get_protocol_options();
@@ -113,5 +115,6 @@ const gchar *twitter_option_url_update_status(PurpleAccount *account);
 const gchar *twitter_option_url_new_dm(PurpleAccount *account);
 const gchar *twitter_option_url_get_saved_searches(PurpleAccount *account);
 const gchar *twitter_option_url_get_search_results(PurpleAccount *account);
+const gchar *twitter_option_url_verify_credentials(PurpleAccount *account);
 /***** END URLS *****/
 #endif

@@ -132,6 +132,11 @@ void twitter_api_search_refresh (PurpleAccount *account,
         TwitterSearchErrorFunc error_func,
         gpointer data);
 
+void twitter_api_verify_credentials(PurpleAccount *account,
+		TwitterSendXmlRequestSuccessFunc success_cb,
+		TwitterSendRequestErrorFunc error_cb,
+		gpointer user_data);
+
 void twitter_api_oauth_request_token(PurpleAccount *account,
 		TwitterSendRequestSuccessFunc success_cb,
 		TwitterSendRequestErrorFunc error_cb,
