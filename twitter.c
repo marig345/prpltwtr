@@ -725,6 +725,7 @@ typedef struct
 	gpointer user_data;
 } TwitterLastSinceIdRequest;
 
+//TODO: rename
 static void twitter_verify_connection(PurpleAccount *account)
 {
 	gboolean retrieve_history;
@@ -942,6 +943,19 @@ static void twitter_oauth_request_token_error_cb(PurpleAccount *account, const T
 	twitter_oauth_disconnect(account, "Error receiving request token");
 }
 
+void twitter_verify_credentials_success_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+{
+	//TODO: case sensitivity
+	TwitterUserTweet *user_tweet = twitter_verify_credentials_parse(node);
+	if (strcmp(user_tweet->screen_name, purple_account_get_username(account)))
+	{
+		twitter_account_username_change_verify(account, user_tweet->screen_name);
+	} else {
+		twitter_verify_connection(account);
+	}
+	twitter_user_tweet_free(user_tweet);
+}
+
 static void twitter_login(PurpleAccount *account)
 {
 	const gchar *oauth_token;
@@ -973,7 +987,10 @@ static void twitter_login(PurpleAccount *account)
 	{
 		twitter->oauth_token = g_strdup(oauth_token);
 		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
-		twitter_verify_connection(account);
+		twitter_api_verify_credentials(account,
+				twitter_verify_credentials_success_cb,
+				NULL,
+				NULL);
 	} else {
 		twitter_api_oauth_request_token(account,
 				twitter_oauth_request_token_success_cb,
