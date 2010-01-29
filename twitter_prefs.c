@@ -35,6 +35,12 @@ GList *twitter_get_protocol_options()
 			TWITTER_PREF_USE_HTTPS_DEFAULT);                        /* default value */
 	options = g_list_append(NULL, option);
 
+	option = purple_account_option_bool_new(
+			("Enable OAuth (more secure)"),
+			TWITTER_PREF_USE_OAUTH,
+			TWITTER_PREF_USE_OAUTH_DEFAULT);
+	options = g_list_append(options, option);
+
 	/* Default sending im to buddy is to dm */
 	option = purple_account_option_bool_new(
 			("Default im to buddy is a DM"),
@@ -247,6 +253,14 @@ gboolean twitter_option_use_https(PurpleAccount *account)
 			account,
 			TWITTER_PREF_USE_HTTPS,
 			TWITTER_PREF_USE_HTTPS_DEFAULT);
+}
+
+gboolean twitter_option_use_oauth(PurpleAccount *account)
+{
+	return purple_account_get_bool(
+			account,
+			TWITTER_PREF_USE_OAUTH,
+			TWITTER_PREF_USE_OAUTH_DEFAULT);
 }
 
 gint twitter_option_home_timeline_max_tweets(PurpleAccount *account)

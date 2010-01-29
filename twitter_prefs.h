@@ -35,6 +35,9 @@
 #define TWITTER_PREF_USE_HTTPS "use_https"
 #define TWITTER_PREF_USE_HTTPS_DEFAULT FALSE
 
+#define TWITTER_PREF_USE_OAUTH "use_oauth"
+#define TWITTER_PREF_USE_OAUTH_DEFAULT FALSE
+
 #define TWITTER_PREF_RETRIEVE_HISTORY "retrieve_tweets_history_after_login"
 #define TWITTER_PREF_RETRIEVE_HISTORY_DEFAULT TRUE
 
@@ -102,6 +105,7 @@ gint twitter_option_user_status_timeout(PurpleAccount *account);
 gboolean twitter_option_get_history(PurpleAccount *account);
 gboolean twitter_option_sync_status(PurpleAccount *account);
 gboolean twitter_option_use_https(PurpleAccount *account);
+gboolean twitter_option_use_oauth(PurpleAccount *account);
 gint twitter_option_home_timeline_max_tweets(PurpleAccount *account);
 gboolean twitter_option_default_dm(PurpleAccount *account);
 

@@ -452,7 +452,8 @@ void twitter_send_xml_request(PurpleAccount *account, gboolean post,
 			post,
 			url,
 			params,
-			!twitter->oauth_token || !twitter->oauth_token_secret,
+			//this shouldn't be here, we should really pass an object of request settings
+			!twitter_option_use_oauth(account) || !twitter->oauth_token || !twitter->oauth_token_secret,
 			twitter_xml_request_success_cb,
 			twitter_xml_request_error_cb,
 			request_data);

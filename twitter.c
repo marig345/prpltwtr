@@ -998,26 +998,29 @@ static void twitter_login(PurpleAccount *account)
 			2);  /* total number of steps */
 
 
-	oauth_token = twitter_account_get_oauth_access_token(account);
-	oauth_token_secret = twitter_account_get_oauth_access_token_secret(account);
-	if (oauth_token && oauth_token_secret)
+	if (twitter_option_use_oauth(account))
 	{
-		twitter->oauth_token = g_strdup(oauth_token);
-		twitter->oauth_token_secret = g_strdup(oauth_token_secret);
-		twitter_api_verify_credentials(account,
-				twitter_verify_credentials_success_cb,
-				NULL,
-				NULL);
+		//If we want to use oauth, go through the oauth steps 
+		oauth_token = twitter_account_get_oauth_access_token(account);
+		oauth_token_secret = twitter_account_get_oauth_access_token_secret(account);
+		if (oauth_token && oauth_token_secret)
+		{
+			twitter->oauth_token = g_strdup(oauth_token);
+			twitter->oauth_token_secret = g_strdup(oauth_token_secret);
+			twitter_api_verify_credentials(account,
+					twitter_verify_credentials_success_cb,
+					NULL,
+					NULL);
+		} else {
+			twitter_api_oauth_request_token(account,
+					twitter_oauth_request_token_success_cb,
+					twitter_oauth_request_token_error_cb,
+					NULL);
+		}
 	} else {
-		twitter_api_oauth_request_token(account,
-				twitter_oauth_request_token_success_cb,
-				twitter_oauth_request_token_error_cb,
-				NULL);
+		//No oauth, just do the verification step, skipping previous oauth steps
+		twitter_verify_connection(account);
 	}
-
-	return;
-
-	//twitter_verify_connection(account);
 }
 
 static void twitter_endpoint_im_free_foreach(TwitterConnectionData *conn, TwitterEndpointIm *im, gpointer data)
