@@ -53,6 +53,17 @@ static void twitter_account_set_oauth_access_token_secret(PurpleAccount *account
 	purple_account_set_string(account, "oauth_token_secret", oauth_token);
 }
 
+static gboolean twitter_usernames_match(PurpleAccount *account, const gchar *u1, const gchar *u2)
+{
+	gboolean match;
+	gchar *u1n = g_strdup(purple_normalize(account, u1));
+	const gchar *u2n = purple_normalize(account, u2);
+	match = !strcmp(u1n, u2n);
+
+	g_free(u1n);
+	return match;
+}
+
 /******************************************************
  *  Chat
  ******************************************************/
@@ -862,7 +873,9 @@ static void twitter_oauth_access_token_success_cb(PurpleAccount *account,
 		twitter_account_set_oauth_access_token_secret(account, oauth_token_secret);
 
 		//FIXME: set this to be case insensitive
-		if (response_screen_name && strcmp(response_screen_name, purple_account_get_username(account)))
+		
+		if (response_screen_name 
+			&& !twitter_usernames_match(account, response_screen_name, purple_account_get_username(account)))
 		{
 			twitter_account_username_change_verify(account, response_screen_name);
 		} else {
@@ -947,10 +960,14 @@ void twitter_verify_credentials_success_cb(PurpleAccount *account, xmlnode *node
 {
 	//TODO: case sensitivity
 	TwitterUserTweet *user_tweet = twitter_verify_credentials_parse(node);
-	if (strcmp(user_tweet->screen_name, purple_account_get_username(account)))
+	if (!user_tweet || !user_tweet->screen_name)
+	{
+		twitter_oauth_disconnect(account, "Could not verify credentials");
+	} else if (!twitter_usernames_match(account,user_tweet->screen_name, purple_account_get_username(account))) 
 	{
 		twitter_account_username_change_verify(account, user_tweet->screen_name);
-	} else {
+	} else 
+	{
 		twitter_verify_connection(account);
 	}
 	twitter_user_tweet_free(user_tweet);
