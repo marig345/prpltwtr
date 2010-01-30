@@ -34,6 +34,77 @@
  * provide for translation, you'll also need to setup the gettext macros. */
 #include "twitter_api.h"
 
+static const gchar *twitter_api_create_url(PurpleAccount *account,
+		const gchar *endpoint)
+{
+	static char url[1024];
+	const gchar *host = twitter_option_api_host(account);
+	const gchar *subdir = twitter_option_api_subdir(account);
+	g_return_val_if_fail(host != NULL && host[0] != '\0' && endpoint != NULL && endpoint[0] != '\0', NULL);
+	
+	if (subdir == NULL || subdir[0] == '\0')
+		 subdir = "/";
+
+	snprintf(url, 1023, "%s%s%s%s%s", 
+			host,
+			subdir[0] == '/' ? "" : "/",
+			subdir,
+			subdir[strlen(subdir) - 1] == '/' || endpoint[0] == '/' ? "" : "/",
+			subdir[strlen(subdir) - 1] == '/' && endpoint[0] == '/' ? endpoint + 1 : endpoint);
+	return url;
+}
+
+static const gchar *twitter_option_url_get_rate_limit_status(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_RATE_LIMIT_STATUS);
+}
+static const gchar *twitter_option_url_get_friends(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_FRIENDS);
+}
+static const gchar *twitter_option_url_get_home_timeline(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_HOME_TIMELINE);
+}
+static const gchar *twitter_option_url_get_mentions(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_MENTIONS);
+}
+static const gchar *twitter_option_url_get_dms(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_DMS);
+}
+static const gchar *twitter_option_url_update_status(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_UPDATE_STATUS);
+}
+static const gchar *twitter_option_url_new_dm(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_NEW_DM);
+}
+static const gchar *twitter_option_url_get_saved_searches(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_SAVED_SEARCHES);
+}
+static const gchar *twitter_option_url_get_search_results(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_SEARCH_RESULTS);
+}
+static const gchar *twitter_option_url_verify_credentials(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_VERIFY_CREDENTIALS);
+}
+
 void twitter_api_get_rate_limit_status(PurpleAccount *account,
 		TwitterSendXmlRequestSuccessFunc success_func,
 		TwitterSendRequestErrorFunc error_func,
