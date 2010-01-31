@@ -38,39 +38,37 @@ static const gchar *twitter_search_create_url(PurpleAccount *account,
 }
 
 typedef struct {
-	PurpleAccount *account;
 	TwitterSearchSuccessFunc success_func;
 	TwitterSearchErrorFunc error_func;
 	gpointer user_data;
 } TwitterSearchContext;
 
 
-static void twitter_send_search_success_cb(PurpleAccount *account, xmlnode *response_node, gpointer user_data)
+static void twitter_send_search_success_cb(TwitterRequestor *r, xmlnode *response_node, gpointer user_data)
 {
 	TwitterSearchContext *ctx = user_data;
 	TwitterSearchResults *results = twitter_search_results_node_parse(response_node);
 
-	ctx->success_func(ctx->account, results->tweets,
+	ctx->success_func(r->account, results->tweets,
 			results->refresh_url, results->max_id, ctx->user_data);
 
 	twitter_search_results_free(results);
 	g_slice_free (TwitterSearchContext, ctx);
 }
 
-void twitter_search(PurpleAccount *account, TwitterRequestParams *params,
+void twitter_search(TwitterRequestor *r, TwitterRequestParams *params,
 		TwitterSearchSuccessFunc success_cb, TwitterSearchErrorFunc error_cb,
 		gpointer data)
 {
-	const gchar *search_url = twitter_search_create_url(account, "/search.atom");
+	const gchar *search_url = twitter_search_create_url(r->account, "/search.atom");
 	TwitterSearchContext *ctx;
 	if (search_url && search_url[0] != '\0')
 	{
 		ctx = g_slice_new0 (TwitterSearchContext);
-		ctx->account = account;
 		ctx->user_data = data;
 		ctx->success_func = success_cb;
 		ctx->error_func = error_cb;
-		twitter_send_xml_request(account, FALSE,
+		twitter_send_xml_request(r, FALSE,
 				search_url, params,
 				twitter_send_search_success_cb, NULL, //TODO error
 				ctx);

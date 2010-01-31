@@ -46,14 +46,13 @@
 //TODO: clean this up to be a bit more robust. 
 
 typedef struct {
-	PurpleAccount *account;
+	TwitterRequestor *requestor;
 	TwitterSendRequestSuccessFunc success_func;
 	TwitterSendRequestErrorFunc error_func;
 	gpointer user_data;
 } TwitterSendRequestData;
 
 typedef struct {
-	PurpleAccount *account;
 	TwitterSendXmlRequestSuccessFunc success_func;
 	TwitterSendRequestErrorFunc error_func;
 	gpointer user_data;
@@ -80,10 +79,10 @@ typedef struct {
 	gpointer user_data;
 } TwitterRequestWithCursorData;
 
-void twitter_send_xml_request_multipage_do(PurpleAccount *account,
+void twitter_send_xml_request_multipage_do(TwitterRequestor *r,
 		TwitterMultiPageRequestData *request_data);
 
-static void twitter_send_xml_request_with_cursor_cb (PurpleAccount *account,
+static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 		xmlnode *node,
 		gpointer user_data);
 
@@ -189,6 +188,17 @@ static gchar *twitter_request_params_to_string(const TwitterRequestParams *param
 	return g_string_free(rv, FALSE);
 
 }
+
+static void twitter_requestor_on_error(TwitterRequestor *r, const TwitterRequestErrorData *error_data, TwitterSendRequestErrorFunc called_error_cb, gpointer user_data)
+{
+	if (r->pre_failed)
+		r->pre_failed(r, &error_data);
+	if (called_error_cb)
+		called_error_cb(r, error_data, user_data);
+	if (r->post_failed)
+		r->post_failed(r, &error_data);
+}
+
 static gint twitter_response_text_status_code(const gchar *response_text)
 {
 	const gchar *ptr;
@@ -268,20 +278,19 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 		TwitterRequestErrorData *error_data = g_new0(TwitterRequestErrorData, 1);
 		error_data->type = error_type;
 		error_data->message = error_message;
-		if (request_data->error_func)
-			request_data->error_func(request_data->account, error_data, request_data->user_data);
+		twitter_requestor_on_error(request_data->requestor, error_data, request_data->error_func, request_data->user_data);
 
 		g_free(error_data);
 	} else {
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
 		if (request_data->success_func)
-			request_data->success_func(request_data->account, url_text, request_data->user_data);
+			request_data->success_func(request_data->requestor, url_text, request_data->user_data);
 	}
 
 	g_free(request_data);
 }
 
-static void twitter_send_request_querystring(PurpleAccount *account,
+static void twitter_send_request_querystring(TwitterRequestor *r,
 		gboolean post,
 		const char *url, const char *query_string,
 		gboolean auth_basic,
@@ -289,6 +298,7 @@ static void twitter_send_request_querystring(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
+	PurpleAccount *account = r->account;
 	gchar *request;
 	const char *pass = purple_connection_get_password(purple_account_get_connection(account));
 	const char *sn = purple_account_get_username(account);
@@ -305,7 +315,7 @@ static void twitter_send_request_querystring(PurpleAccount *account,
 			full_url,
 			query_string ? query_string : "");
 
-	request_data->account = account;
+	request_data->requestor = r;
 	request_data->user_data = data;
 	request_data->success_func = success_callback;
 	request_data->error_func = error_callback;
@@ -340,7 +350,7 @@ static void twitter_send_request_querystring(PurpleAccount *account,
 	g_free(host);
 }
 
-void twitter_send_request(PurpleAccount *account,
+void twitter_send_request(TwitterRequestor *r,
 		gboolean post,
 		const char *url,
 		const TwitterRequestParams *params,
@@ -349,6 +359,7 @@ void twitter_send_request(PurpleAccount *account,
 		TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
+	PurpleAccount *account = r->account;
 	gchar *querystring;
 	if (!auth_basic)
 	{
@@ -367,7 +378,7 @@ void twitter_send_request(PurpleAccount *account,
 			gchar *error_msg = g_strdup("Could not sign request");
 			error->type = TWITTER_REQUEST_ERROR_NO_OAUTH;
 			error->message = error_msg;
-			error_callback(account, error, data);
+			error_callback(r, error, data);
 			g_free(error_msg);
 			g_free(error);
 			g_free(signing_key);
@@ -381,7 +392,7 @@ void twitter_send_request(PurpleAccount *account,
 	} else {
 		querystring = twitter_request_params_to_string(params);
 	}
-	twitter_send_request_querystring(account,
+	twitter_send_request_querystring(r,
 			post,
 			url, querystring,
 			auth_basic,
@@ -392,7 +403,7 @@ void twitter_send_request(PurpleAccount *account,
 	g_free(querystring);
 }
 
-static void twitter_xml_request_success_cb(PurpleAccount *account, const gchar *response, gpointer user_data)
+static void twitter_xml_request_success_cb(TwitterRequestor *r, const gchar *response, gpointer user_data)
 {
 	TwitterSendXmlRequestData *request_data = user_data;
 	const gchar *error_message = NULL;
@@ -419,17 +430,19 @@ static void twitter_xml_request_success_cb(PurpleAccount *account, const gchar *
 
 	if (error_type != TWITTER_REQUEST_ERROR_NONE)
 	{
+		/* Turns out this wasn't really a success. We got a twitter error instead of an HTTP error
+		 * So go through the error cycle 
+		 */
 		TwitterRequestErrorData *error_data = g_new0(TwitterRequestErrorData, 1);
 		error_data->type = error_type;
 		error_data->message = error_message;
-		if (request_data->error_func)
-			request_data->error_func(request_data->account, error_data, request_data->user_data);
+		twitter_requestor_on_error(r, error_data, request_data->error_func, request_data->user_data);
 
 		g_free(error_data);
 	} else {
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
 		if (request_data->success_func)
-			request_data->success_func(request_data->account, response_node, request_data->user_data);
+			request_data->success_func(r, response_node, request_data->user_data);
 	}
 
 	if (response_node != NULL)
@@ -439,34 +452,37 @@ static void twitter_xml_request_success_cb(PurpleAccount *account, const gchar *
 	g_free(request_data);
 }
 
-static void twitter_xml_request_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+static void twitter_xml_request_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
+	/* This gets called after the pre_failed and before the post_failed.
+	 * So we just pass the error along to our caller. No need to call the requestor_on_fail 
+	 * In fact, if we do, we'll get an infinite loop
+	 */
 	TwitterSendXmlRequestData *request_data = user_data;
 	if (request_data->error_func)
-		request_data->error_func(request_data->account, error_data, request_data->user_data);
+		request_data->error_func(r, error_data, request_data->user_data);
 	g_free(request_data);
 }
 
-void twitter_send_xml_request(PurpleAccount *account, gboolean post,
+void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
 
-	PurpleConnection *gc = purple_account_get_connection(account);
+	PurpleConnection *gc = purple_account_get_connection(r->account);
 	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
-	request_data->account = account;
 	request_data->user_data = data;
 	request_data->success_func = success_callback;
 	request_data->error_func = error_callback;
 
-	twitter_send_request(account,
+	twitter_send_request(r,
 			post,
 			url,
 			params,
 			//this shouldn't be here, we should really pass an object of request settings
-			!twitter_option_use_oauth(account) || !twitter->oauth_token || !twitter->oauth_token_secret,
+			!twitter_option_use_oauth(r->account) || !twitter->oauth_token || !twitter->oauth_token_secret,
 			twitter_xml_request_success_cb,
 			twitter_xml_request_error_cb,
 			request_data);
@@ -588,7 +604,7 @@ static int xmlnode_child_count(xmlnode *parent)
 	return count;
 }
 
-void twitter_send_xml_request_multipage_cb(PurpleAccount *account, xmlnode *node, gpointer user_data)
+void twitter_send_xml_request_multipage_cb(TwitterRequestor *r, xmlnode *node, gpointer user_data)
 {
 	TwitterMultiPageRequestData *request_data = user_data;
 	int count = 0;
@@ -613,7 +629,7 @@ void twitter_send_xml_request_multipage_cb(PurpleAccount *account, xmlnode *node
 				G_STRFUNC);
 	}
 	else {
-		get_next_page = request_data->success_callback(account,
+		get_next_page = request_data->success_callback(r,
 				node,
 				last_page,
 				request_data,
@@ -631,10 +647,10 @@ void twitter_send_xml_request_multipage_cb(PurpleAccount *account, xmlnode *node
 		g_free(request_data);
 	} else {
 		request_data->page++;
-		twitter_send_xml_request_multipage_do(account, request_data);
+		twitter_send_xml_request_multipage_do(r, request_data);
 	}
 }
-void twitter_send_xml_request_multipage_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+void twitter_send_xml_request_multipage_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	TwitterMultiPageRequestData *request_data = user_data;
 	gboolean try_again;
@@ -642,13 +658,13 @@ void twitter_send_xml_request_multipage_error_cb(PurpleAccount *account, const T
 	if (!request_data->error_callback)
 		try_again = FALSE;
 	else
-		try_again = request_data->error_callback(account, error_data, request_data->user_data);
+		try_again = request_data->error_callback(r, error_data, request_data->user_data);
 
 	if (try_again)
-		twitter_send_xml_request_multipage_do(account, request_data);
+		twitter_send_xml_request_multipage_do(r, request_data);
 }
 
-void twitter_send_xml_request_multipage_do(PurpleAccount *account,
+void twitter_send_xml_request_multipage_do(TwitterRequestor *r,
 		TwitterMultiPageRequestData *request_data)
 {
 	int len = request_data->params->len;
@@ -657,7 +673,7 @@ void twitter_send_xml_request_multipage_do(PurpleAccount *account,
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s: page: %d\n", G_STRFUNC, request_data->page);
 
-	twitter_send_xml_request(account, FALSE,
+	twitter_send_xml_request(r, FALSE,
 			request_data->url, request_data->params,
 			twitter_send_xml_request_multipage_cb, twitter_send_xml_request_multipage_error_cb,
 			request_data);
@@ -665,7 +681,7 @@ void twitter_send_xml_request_multipage_do(PurpleAccount *account,
 }
 
 
-void twitter_send_xml_request_multipage(PurpleAccount *account,
+void twitter_send_xml_request_multipage(TwitterRequestor *r,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageSuccessFunc success_callback,
 		TwitterSendRequestMultiPageErrorFunc error_callback,
@@ -680,7 +696,7 @@ void twitter_send_xml_request_multipage(PurpleAccount *account,
 	request_data->page = 1;
 	request_data->expected_count = expected_count;
 
-	twitter_send_xml_request_multipage_do(account, request_data);
+	twitter_send_xml_request_multipage_do(r, request_data);
 }
 
 static void twitter_multipage_all_request_data_free(TwitterMultiPageAllRequestData *request_data_all)
@@ -694,7 +710,7 @@ static void twitter_multipage_all_request_data_free(TwitterMultiPageAllRequestDa
 	g_free(request_data_all);
 }
 
-static gboolean twitter_send_xml_request_multipage_all_success_cb(PurpleAccount *account,
+static gboolean twitter_send_xml_request_multipage_all_success_cb(TwitterRequestor *r,
 		xmlnode *node,
 		gboolean last_page,
 		TwitterMultiPageRequestData *request_multi,
@@ -710,7 +726,7 @@ static gboolean twitter_send_xml_request_multipage_all_success_cb(PurpleAccount 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s last_page: %d current_count: %d max_count: %d per page: %d\n", G_STRFUNC, last_page ? 1 : 0, request_data_all->current_count, request_data_all->max_count, request_multi->expected_count);
 	if (last_page || (request_data_all->max_count > 0 && request_data_all->current_count >= request_data_all->max_count))
 	{
-		request_data_all->success_callback(account, request_data_all->nodes, request_data_all->user_data);
+		request_data_all->success_callback(r, request_data_all->nodes, request_data_all->user_data);
 		twitter_multipage_all_request_data_free(request_data_all);
 		return FALSE;
 	} else if (request_data_all->max_count > 0 && (request_data_all->current_count + request_multi->expected_count > request_data_all->max_count)) {
@@ -719,16 +735,16 @@ static gboolean twitter_send_xml_request_multipage_all_success_cb(PurpleAccount 
 	return TRUE;
 }
 
-static gboolean twitter_send_xml_request_multipage_all_error_cb(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data)
+static gboolean twitter_send_xml_request_multipage_all_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	TwitterMultiPageAllRequestData *request_data_all = user_data;
-	if (request_data_all->error_callback && request_data_all->error_callback(account, error_data, request_data_all->user_data))
+	if (request_data_all->error_callback && request_data_all->error_callback(r, error_data, request_data_all->user_data))
 		return TRUE;
 	twitter_multipage_all_request_data_free(request_data_all);
 	return FALSE;
 }
 
-void twitter_send_xml_request_multipage_all(PurpleAccount *account,
+void twitter_send_xml_request_multipage_all(TwitterRequestor *r,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
@@ -744,7 +760,7 @@ void twitter_send_xml_request_multipage_all(PurpleAccount *account,
 	if (max_count > 0 && expected_count > max_count)
 		expected_count = max_count;
 
-	twitter_send_xml_request_multipage(account,
+	twitter_send_xml_request_multipage(r,
 			url,
 			params,
 			twitter_send_xml_request_multipage_all_success_cb,
@@ -771,7 +787,7 @@ static void twitter_request_with_cursor_data_free (
 	g_slice_free (TwitterRequestWithCursorData, request_data);
 }
 
-static void twitter_send_xml_request_with_cursor_cb (PurpleAccount *account,
+static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 		xmlnode *node,
 		gpointer user_data)
 {
@@ -806,7 +822,7 @@ static void twitter_send_xml_request_with_cursor_cb (PurpleAccount *account,
 		twitter_request_params_add(request_data->params,
 				twitter_request_param_new_ll("cursor", request_data->next_cursor));
 
-		twitter_send_xml_request(account, FALSE,
+		twitter_send_xml_request(r, FALSE,
 				request_data->url, request_data->params,
 				twitter_send_xml_request_with_cursor_cb,
 				NULL,
@@ -815,14 +831,14 @@ static void twitter_send_xml_request_with_cursor_cb (PurpleAccount *account,
 		twitter_request_params_set_size(request_data->params, len);
 	}
 	else {
-		request_data->success_callback (account,
+		request_data->success_callback(r,
 				request_data->nodes,
 				request_data->user_data);
 		twitter_request_with_cursor_data_free (request_data);
 	}
 }
 
-void twitter_send_xml_request_with_cursor (PurpleAccount *account,
+void twitter_send_xml_request_with_cursor(TwitterRequestor *r,
 		const char *url, const TwitterRequestParams *params, long long cursor,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
@@ -843,7 +859,7 @@ void twitter_send_xml_request_with_cursor (PurpleAccount *account,
 	twitter_request_params_add(request_data->params,
 			twitter_request_param_new_ll("cursor", cursor));
 
-	twitter_send_xml_request(account, FALSE,
+	twitter_send_xml_request(r, FALSE,
 			url, request_data->params,
 			twitter_send_xml_request_with_cursor_cb,
 			NULL,
