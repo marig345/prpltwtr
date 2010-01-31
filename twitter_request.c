@@ -313,7 +313,7 @@ static void twitter_send_request_querystring(PurpleAccount *account,
 	g_free(auth_text);
 
 	request = g_strdup_printf(
-			"%s %s%s%s HTTP/1.1\r\n"
+			"%s %s%s%s HTTP/1.0\r\n"
 			"User-Agent: " USER_AGENT "\r\n"
 			"Host: %s\r\n"
 			"%s%s%s" //Authorization if auth_basic
