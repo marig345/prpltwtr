@@ -52,6 +52,11 @@ static void twitter_account_set_oauth_access_token_secret(PurpleAccount *account
 {
 	purple_account_set_string(account, "oauth_token_secret", oauth_token);
 }
+static void twitter_account_invalidate_token(PurpleAccount *account)
+{
+	twitter_account_set_oauth_access_token(account, NULL);
+	twitter_account_set_oauth_access_token_secret(account, NULL);
+}
 
 static gboolean twitter_usernames_match(PurpleAccount *account, const gchar *u1, const gchar *u2)
 {
@@ -808,8 +813,7 @@ typedef struct
 static void twitter_account_mismatch_screenname_change_cancel_cb(TwitterAccountUserNameChange *change, gint action_id)
 {
 	PurpleAccount *account = change->account;
-	twitter_account_set_oauth_access_token(account, NULL);
-	twitter_account_set_oauth_access_token_secret(account, NULL);
+	twitter_account_invalidate_token(account);
 	g_free(change->username);
 	g_free(change);
 	twitter_oauth_disconnect(account, "Username mismatch");
@@ -984,6 +988,15 @@ static void twitter_requestor_post_failed_test(TwitterRequestor *r, const Twitte
 			r->account->username,
 			(*error_data)->type,
 			(*error_data)->message);
+	switch ((*error_data)->type)
+	{
+		case TWITTER_REQUEST_ERROR_UNAUTHORIZED:
+			twitter_account_invalidate_token(r->account);
+			twitter_oauth_disconnect(r->account, "Unauthorized");
+			break;
+		default:
+			break;
+	}
 }
 
 static void twitter_login(PurpleAccount *account)
