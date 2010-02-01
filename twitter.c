@@ -981,7 +981,60 @@ void twitter_verify_credentials_success_cb(TwitterRequestor *r, xmlnode *node, g
 	twitter_user_tweet_free(user_tweet);
 }
 
-static void twitter_requestor_post_failed_test(TwitterRequestor *r, const TwitterRequestErrorData **error_data)
+static void twitter_requestor_pre_send_auth_basic(TwitterRequestor *r, gboolean *post, const char **url, TwitterRequestParams **params, gchar ***header_fields, gpointer *requestor_data)
+{
+	const char *pass = purple_connection_get_password(purple_account_get_connection(r->account));
+	const char *sn = purple_account_get_username(r->account);
+	char *auth_text = g_strdup_printf("%s:%s", sn, pass);
+	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
+	*header_fields = g_new(gchar *, 2);
+
+	(*header_fields)[0] = g_strdup_printf("Authorization: Basic %s", auth_text_b64);
+	(*header_fields)[1] = NULL;
+
+	g_free(auth_text);
+	g_free(auth_text_b64);
+}
+static void twitter_requestor_post_send_auth_basic(TwitterRequestor *r, gboolean *post, const char **url, TwitterRequestParams **params, gchar ***header_fields, gpointer *requestor_data)
+{
+	g_strfreev(*header_fields);
+}
+
+static void twitter_requestor_pre_send_oauth(TwitterRequestor *r, gboolean *post, const char **url, TwitterRequestParams **params, gchar ***header_fields, gpointer *requestor_data)
+{
+	PurpleAccount *account = r->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	TwitterConnectionData *twitter = gc->proto_data;
+	gchar *signing_key = g_strdup_printf("%s&%s",
+			TWITTER_OAUTH_SECRET,
+			twitter->oauth_token_secret ? twitter->oauth_token_secret : "");
+	TwitterRequestParams *oauth_params = twitter_request_params_add_oauth_params(
+			account, *post, *url,
+			*params, twitter->oauth_token, signing_key);
+
+	if (oauth_params == NULL)
+	{
+		TwitterRequestErrorData *error = g_new0(TwitterRequestErrorData, 1);
+		gchar *error_msg = g_strdup("Could not sign request");
+		error->type = TWITTER_REQUEST_ERROR_NO_OAUTH;
+		error->message = error_msg;
+		g_free(error_msg);
+		g_free(error);
+		g_free(signing_key);
+		//TODO: error if couldn't sign
+		return;
+	} 
+	*requestor_data = *params;
+	*params = oauth_params;
+}
+
+static void twitter_requestor_post_send_oauth(TwitterRequestor *r, gboolean *post, const char **url, TwitterRequestParams **params, gchar ***header_fields, gpointer *requestor_data)
+{
+	twitter_request_params_free(*params);
+	*params = (TwitterRequestParams *) *requestor_data;
+}
+
+static void twitter_requestor_post_failed(TwitterRequestor *r, const TwitterRequestErrorData **error_data)
 {
 	purple_debug_info(TWITTER_PROTOCOL_ID,
 			"post_failed called for account %s, error %d, message %s\n",
@@ -1011,7 +1064,16 @@ static void twitter_login(PurpleAccount *account)
 
 	twitter->requestor = g_new0(TwitterRequestor, 1);
 	twitter->requestor->account = account;
-	twitter->requestor->post_failed = twitter_requestor_post_failed_test;
+	twitter->requestor->post_failed = twitter_requestor_post_failed;
+
+	if (!twitter_option_use_oauth(account))
+	{
+		twitter->requestor->pre_send = twitter_requestor_pre_send_auth_basic;
+		twitter->requestor->post_send = twitter_requestor_post_send_auth_basic;
+	} else {
+		twitter->requestor->pre_send = twitter_requestor_pre_send_oauth;
+		twitter->requestor->post_send = twitter_requestor_post_send_oauth;
+	}
 
 	/* key: gchar *, value: TwitterEndpointChat */
 	twitter->chat_contexts = g_hash_table_new_full(

@@ -86,10 +86,6 @@ static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 		xmlnode *node,
 		gpointer user_data);
 
-static TwitterRequestParams *twitter_request_params_add_oauth_params(PurpleAccount *account,
-		gboolean post, const gchar *url,
-		const TwitterRequestParams *params,
-		const gchar *token, const gchar *signing_key);
 
 TwitterRequestParam *twitter_request_param_new(const gchar *name, const gchar *value)
 {
@@ -292,18 +288,15 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 
 static void twitter_send_request_querystring(TwitterRequestor *r,
 		gboolean post,
-		const char *url, const char *query_string,
-		gboolean auth_basic,
+		const char *url,
+		const char *query_string,
+		char **header_fields,
 		TwitterSendRequestSuccessFunc success_callback,
 		TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
 	PurpleAccount *account = r->account;
 	gchar *request;
-	const char *pass = purple_connection_get_password(purple_account_get_connection(account));
-	const char *sn = purple_account_get_username(account);
-	char *auth_text = g_strdup_printf("%s:%s", sn, pass);
-	char *auth_text_b64 = purple_base64_encode((guchar *) auth_text, strlen(auth_text));
 	gboolean use_https = twitter_option_use_https(account) && purple_ssl_is_supported();
 	char *slash = strchr(url, '/');
 	TwitterSendRequestData *request_data = g_new0(TwitterSendRequestData, 1);
@@ -311,6 +304,8 @@ static void twitter_send_request_querystring(TwitterRequestor *r,
 	char *full_url = g_strdup_printf("%s://%s",
 			use_https ? "https" : "http",
 			url);
+	char *header_fields_text = (header_fields ? g_strjoinv("\r\n", header_fields) : NULL);
+
 	purple_debug_info(TWITTER_PROTOCOL_ID, "Sending request to: %s ? %s\n",
 			full_url,
 			query_string ? query_string : "");
@@ -320,85 +315,59 @@ static void twitter_send_request_querystring(TwitterRequestor *r,
 	request_data->success_func = success_callback;
 	request_data->error_func = error_callback;
 
-	g_free(auth_text);
-
 	request = g_strdup_printf(
 			"%s %s%s%s HTTP/1.0\r\n"
 			"User-Agent: " USER_AGENT "\r\n"
 			"Host: %s\r\n"
-			"%s%s%s" //Authorization if auth_basic
 			"%s" //Content-Type if post
+			"%s%s" //extra header fields, if any
 			"Content-Length: %lu\r\n\r\n"
 			"%s",
 			post ? "POST" : "GET",
 			full_url,
 			(!post && query_string ? "?" : ""), (!post && query_string ? query_string : ""),
 			host,
-			auth_basic ? "Authorization: Basic " : "",
-			auth_basic ? auth_text_b64 : "",
-			auth_basic ? "\r\n" : "",
+			header_fields_text ? header_fields_text : "",
+			header_fields_text ? "\r\n" : "",
 			post ? "Content-Type: application/x-www-form-urlencoded\r\n" : "",
 			query_string && post ? strlen(query_string) : 0,
 			query_string && post ? query_string : "");
 
-	g_free(auth_text_b64);
 	purple_util_fetch_url_request(full_url, TRUE,
 			USER_AGENT, TRUE, request, TRUE,
 			twitter_send_request_cb, request_data);
 	g_free(full_url);
 	g_free(request);
 	g_free(host);
+	g_free(header_fields_text);
 }
 
 void twitter_send_request(TwitterRequestor *r,
 		gboolean post,
 		const char *url,
-		const TwitterRequestParams *params,
-		gboolean auth_basic,
+		TwitterRequestParams *params,
 		TwitterSendRequestSuccessFunc success_callback,
 		TwitterSendRequestErrorFunc error_callback,
 		gpointer data)
 {
-	PurpleAccount *account = r->account;
 	gchar *querystring;
-	if (!auth_basic)
-	{
-		PurpleConnection *gc = purple_account_get_connection(account);
-		TwitterConnectionData *twitter = gc->proto_data;
-		gchar *signing_key = g_strdup_printf("%s&%s",
-				TWITTER_OAUTH_SECRET,
-				twitter->oauth_token_secret ? twitter->oauth_token_secret : "");
-		TwitterRequestParams *oauth_params = twitter_request_params_add_oauth_params(
-			account, post, url,
-			params, twitter->oauth_token, signing_key);
+	gpointer requestor_data = NULL;
+	gchar **header_fields = NULL;
 
-		if (oauth_params == NULL)
-		{
-			TwitterRequestErrorData *error = g_new0(TwitterRequestErrorData, 1);
-			gchar *error_msg = g_strdup("Could not sign request");
-			error->type = TWITTER_REQUEST_ERROR_NO_OAUTH;
-			error->message = error_msg;
-			error_callback(r, error, data);
-			g_free(error_msg);
-			g_free(error);
-			g_free(signing_key);
-			return;
-		} else {
-			querystring = twitter_request_params_to_string(oauth_params);
+	if (r->pre_send)
+		r->pre_send(r, &post, &url, &params, &header_fields, &requestor_data);
 
-			twitter_request_params_free(oauth_params);
-			g_free(signing_key);
-		}
-	} else {
-		querystring = twitter_request_params_to_string(params);
-	}
+	querystring = twitter_request_params_to_string(params);
 	twitter_send_request_querystring(r,
 			post,
 			url, querystring,
-			auth_basic,
+			header_fields,
 			success_callback,
 			error_callback,
 			data);
+
+	if (r->post_send)
+		r->post_send(r, &post, &url, &params, &header_fields, &requestor_data);
 
 	g_free(querystring);
 }
@@ -470,8 +439,6 @@ void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 		gpointer data)
 {
 
-	PurpleConnection *gc = purple_account_get_connection(r->account);
-	TwitterConnectionData *twitter = gc->proto_data;
 	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
 	request_data->user_data = data;
 	request_data->success_func = success_callback;
@@ -481,8 +448,6 @@ void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 			post,
 			url,
 			params,
-			//this shouldn't be here, we should really pass an object of request settings
-			!twitter_option_use_oauth(r->account) || !twitter->oauth_token || !twitter->oauth_token_secret,
 			twitter_xml_request_success_cb,
 			twitter_xml_request_error_cb,
 			request_data);
@@ -494,7 +459,7 @@ static long long twitter_oauth_generate_nonce()
 	return ++nonce;
 }
 
-static gint twitter_request_params_sort_do(const TwitterRequestParam **a, TwitterRequestParam **b)
+static gint twitter_request_params_sort_do(TwitterRequestParam **a, TwitterRequestParam **b)
 {
 	gint val = strcmp((*a)->name, (*b)->name);
 	if (val == 0)
@@ -839,7 +804,7 @@ static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 }
 
 void twitter_send_xml_request_with_cursor(TwitterRequestor *r,
-		const char *url, const TwitterRequestParams *params, long long cursor,
+		const char *url, TwitterRequestParams *params, long long cursor,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
 		gpointer data)

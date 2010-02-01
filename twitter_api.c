@@ -95,11 +95,6 @@ static const gchar *twitter_option_url_get_saved_searches(PurpleAccount *account
 	return twitter_api_create_url(account,
 			TWITTER_PREF_URL_GET_SAVED_SEARCHES);
 }
-static const gchar *twitter_option_url_get_search_results(PurpleAccount *account)
-{
-	return twitter_api_create_url(account,
-			TWITTER_PREF_URL_GET_SEARCH_RESULTS);
-}
 static const gchar *twitter_option_url_verify_credentials(PurpleAccount *account)
 {
 	return twitter_api_create_url(account,
@@ -554,7 +549,6 @@ void twitter_api_oauth_request_token(TwitterRequestor *r,
 			FALSE,
 			"twitter.com/oauth/request_token",
 			NULL,
-			FALSE,
 			success_cb,
 			error_cb,
 			user_data);
@@ -572,7 +566,6 @@ void twitter_api_oauth_access_token(TwitterRequestor *r,
 			FALSE,
 			"twitter.com/oauth/access_token",
 			params,
-			FALSE,
 			success_cb,
 			error_cb,
 			user_data);

@@ -72,7 +72,8 @@ typedef void (*TwitterSendRequestErrorFunc)(TwitterRequestor *r, const TwitterRe
 struct _TwitterRequestor
 {
 	PurpleAccount *account;
-	void (*pre_send)(TwitterRequestor *r, gboolean *post, const char **url, const TwitterRequestParams **params);
+	void (*pre_send)(TwitterRequestor *r, gboolean *post, const char **url, TwitterRequestParams **params, gchar ***header_fields, gpointer *requestor_data);
+	void (*post_send)(TwitterRequestor *r, gboolean *post, const char **url, TwitterRequestParams **params, gchar ***header_fields, gpointer *requestor_data);
 	gboolean (*pre_failed)(TwitterRequestor *r, const TwitterRequestErrorData **error_data);
 	void (*post_failed)(TwitterRequestor *r, const TwitterRequestErrorData **error_data);
 };
@@ -102,8 +103,7 @@ typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(TwitterRequestor *r,
 void twitter_send_request(TwitterRequestor *r,
 		gboolean post,
 		const char *url,
-		const TwitterRequestParams *params,
-		gboolean auth_basic,
+		TwitterRequestParams *params,
 		TwitterSendRequestSuccessFunc success_callback,
 		TwitterSendRequestErrorFunc error_callback,
 		gpointer data);
@@ -123,9 +123,14 @@ void twitter_send_xml_request_multipage_all(TwitterRequestor *r,
 /* statuses/friends API deprecated page based retrieval,
  * and use cursor based method instead */
 void twitter_send_xml_request_with_cursor (TwitterRequestor *r,
-       const char *url, const TwitterRequestParams *params, long long cursor,
+       const char *url, TwitterRequestParams *params, long long cursor,
        TwitterSendRequestMultiPageAllSuccessFunc success_callback,
        TwitterSendRequestMultiPageAllErrorFunc error_callback,
        gpointer data);
+
+TwitterRequestParams *twitter_request_params_add_oauth_params(PurpleAccount *account,
+		gboolean post, const gchar *url,
+		const TwitterRequestParams *params,
+		const gchar *token, const gchar *signing_key);
 
 #endif
