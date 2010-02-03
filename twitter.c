@@ -626,25 +626,27 @@ static char *twitter_status_text(PurpleBuddy *buddy) {
 
 static void twitter_tooltip_text(PurpleBuddy *buddy,
 		PurpleNotifyUserInfo *info,
-		gboolean full) {
+		gboolean full) 
+{
 
-	if (PURPLE_BUDDY_IS_ONLINE(buddy))
+	PurplePresence *presence = purple_buddy_get_presence(buddy);
+	PurpleStatus *status = purple_presence_get_active_status(presence);
+	char *msg;
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "showing %s tooltip for %s\n",
+			(full) ? "full" : "short", buddy->name);
+
+	if ((msg = twitter_status_text(buddy)))
 	{
-		PurplePresence *presence = purple_buddy_get_presence(buddy);
-		PurpleStatus *status = purple_presence_get_active_status(presence);
-		char *msg = twitter_status_text(buddy);
 		purple_notify_user_info_add_pair(info, purple_status_get_name(status),
 				msg);
 		g_free(msg);
+	}
 
-		if (full) {
-			/*const char *user_info = purple_account_get_user_info(gc->account);
-			  if (user_info)
-			  purple_notify_user_info_add_pair(info, _("User info"), user_info);*/
-		}
-
-		purple_debug_info(TWITTER_PROTOCOL_ID, "showing %s tooltip for %s\n",
-				(full) ? "full" : "short", buddy->name);
+	if (full) {
+		/*const char *user_info = purple_account_get_user_info(gc->account);
+		  if (user_info)
+		  purple_notify_user_info_add_pair(info, _("User info"), user_info);*/
 	}
 }
 
@@ -683,8 +685,8 @@ static GList *twitter_status_types(PurpleAccount *account)
 
 	type = purple_status_type_new(PURPLE_STATUS_OFFLINE, TWITTER_STATUS_OFFLINE,
 			TWITTER_STATUS_OFFLINE, TRUE);
-	/*purple_status_type_add_attr(type, "message", ("Offline"),
-			purple_value_new(PURPLE_TYPE_STRING));*/
+	purple_status_type_add_attr(type, "message", ("Offline"),
+			purple_value_new(PURPLE_TYPE_STRING));
 	types = g_list_prepend(types, type);
 
 	return g_list_reverse(types);
