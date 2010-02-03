@@ -208,13 +208,31 @@ static gint twitter_response_text_status_code(const gchar *response_text)
 	return atoi(ptr);
 }
 
+static gchar *twitter_xml_node_parse_error(const xmlnode *node)
+{
+	return xmlnode_get_child_data(node, "error");
+}
+
+static gchar *twitter_xml_text_parse_error(const gchar *response)
+{
+	xmlnode *response_node;
+	if ((response_node = xmlnode_from_str(response, strlen(response))))
+	{
+		gchar *message = twitter_xml_node_parse_error(response_node);
+		xmlnode_free(response_node);
+		return message;
+	}
+	return NULL;
+}
+
+
 static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer user_data,
 		const gchar *response_text, gsize len,
 		const gchar *server_error_message)
 {
 	const gchar *url_text;
 	TwitterSendRequestData *request_data = user_data;
-	const gchar *error_message = NULL;
+	gchar *error_message = NULL;
 	TwitterRequestErrorType error_type = TWITTER_REQUEST_ERROR_NONE;
 	gint status_code = twitter_response_text_status_code(response_text);
 
@@ -230,7 +248,7 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 	{
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: %s\n", server_error_message);
 		error_type = TWITTER_REQUEST_ERROR_SERVER;
-		error_message = server_error_message;
+		error_message = g_strdup(server_error_message);
 	} else {
 		switch (status_code)
 		{
@@ -238,12 +256,15 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 			break;
 			case 304: //Not Modified
 			break;
-			case 400: //Bad Request
-				//TODO
-			break;
 			case 401: //Unauthorized
 				error_type = TWITTER_REQUEST_ERROR_UNAUTHORIZED;
-				error_message = url_text;
+			break;
+			default:
+				error_type = TWITTER_REQUEST_ERROR_TWITTER_GENERAL;
+			break;
+			/*
+			case 400: //Bad Request
+				//TODO
 			break;
 			case 403: //Forbidden
 				//TODO
@@ -266,6 +287,13 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 			case 504: //Service Unavailable
 				//TODO
 			break;
+			*/
+		}
+		if (error_type != TWITTER_REQUEST_ERROR_NONE)
+		{
+			error_message = twitter_xml_text_parse_error(response_text);
+			if (!error_message)
+				error_message = g_strdup_printf("Status code: %d", status_code);
 		}
 	}
 
@@ -275,7 +303,6 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 		error_data->type = error_type;
 		error_data->message = error_message;
 		twitter_requestor_on_error(request_data->requestor, error_data, request_data->error_func, request_data->user_data);
-
 		g_free(error_data);
 	} else {
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
@@ -283,6 +310,8 @@ static void twitter_send_request_cb(PurpleUtilFetchUrlData *url_data, gpointer u
 			request_data->success_func(request_data->requestor, url_text, request_data->user_data);
 	}
 
+	if (error_message)
+		g_free(error_message);
 	g_free(request_data);
 }
 
@@ -387,11 +416,9 @@ static void twitter_xml_request_success_cb(TwitterRequestor *r, const gchar *res
 		error_type = TWITTER_REQUEST_ERROR_INVALID_XML;
 		error_message = response;
 	} else {
-		xmlnode *error_node;
-		if ((error_node = xmlnode_get_child(response_node, "error")) != NULL)
+		if ((error_message = twitter_xml_node_parse_error(response_node)))
 		{
 			error_type = TWITTER_REQUEST_ERROR_TWITTER_GENERAL;
-			error_node_text = xmlnode_get_data(error_node);
 			error_message = error_node_text;
 			purple_debug_info(TWITTER_PROTOCOL_ID, "Response error: Twitter error %s\n", error_message);
 		}
