@@ -534,9 +534,9 @@ static void twitter_connected(PurpleAccount *account)
 	} else {
 		twitter->get_friends_timer = 0;
 	}
-	if (TWITTER_ONLINE_CUTOFF_TIME_HOURS > 0)
+	if (twitter_option_cutoff_time(account) > 0)
 		twitter->update_presense_timer = purple_timeout_add_seconds(
-			5 * 60, twitter_update_presense_timeout, account);
+			TWITTER_UPDATE_PRESENCE_TIMEOUT * 60, twitter_update_presense_timeout, account);
 	twitter_init_auto_open_contexts(account);
 }
 static void twitter_get_friends_verify_connection_cb(TwitterRequestor *r,

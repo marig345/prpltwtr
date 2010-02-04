@@ -13,10 +13,11 @@ TwitterUserTweet *twitter_buddy_get_buddy_data(PurpleBuddy *b)
 
 static time_t twitter_account_get_online_cutoff(PurpleAccount *account)
 {
-	if (TWITTER_ONLINE_CUTOFF_TIME_HOURS == 0)
+	int cutoff_hours = twitter_option_cutoff_time(account);
+	if (cutoff_hours == 0)
 		return 0;
 	else
-		return time(NULL) - 60 * 60 * TWITTER_ONLINE_CUTOFF_TIME_HOURS;
+		return time(NULL) - 60 * 60 * cutoff_hours;
 }
 
 
