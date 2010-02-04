@@ -802,7 +802,8 @@ static void twitter_verify_connection(PurpleAccount *account)
 				NULL);
 	} else {
 		twitter_connected(account);
-		twitter_set_all_buddies_online(account);
+		if (twitter_option_cutoff_time(account) <= 0)
+			twitter_set_all_buddies_online(account);
 	}
 }
 
