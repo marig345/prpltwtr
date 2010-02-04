@@ -1317,7 +1317,7 @@ static void twitter_add_buddy(PurpleConnection *gc, PurpleBuddy *buddy,
 	//For the time being, if the user doesn't want to automatically download all their
 	//friends (people they follow), just assume the friend is valid and set them online
 	PurpleAccount *account = purple_connection_get_account(gc);
-	if (!twitter_option_get_following(account))
+	if (!twitter_option_get_following(account) && twitter_option_cutoff_time(account) <= 0)
 	{
 		purple_prpl_got_user_status(account,
 				purple_buddy_get_name(buddy),
