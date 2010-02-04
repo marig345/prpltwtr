@@ -220,7 +220,7 @@ static gboolean twitter_get_friends_verify_error_cb(TwitterRequestor *r,
 /******************************************************
  *  Twitter friends
  ******************************************************/
-static gboolean twitter_update_presense_timeout(gpointer _account)
+static gboolean twitter_update_presence_timeout(gpointer _account)
 {
 	/* If someone is bored and wants to do this the right way, 
 	 * they would have a list of buddies sorted by time
@@ -252,7 +252,7 @@ static void twitter_buddy_datas_set_all(PurpleAccount *account, GList *buddy_dat
 		TwitterTweet *status = twitter_user_tweet_take_tweet(data);
 
 		if (user)
-			twitter_buddy_set_user_data(account, user, TRUE);
+			twitter_buddy_set_user_data(account, user, twitter_option_get_following(account));
 		if (status)
 			twitter_buddy_set_status_data(account, data->screen_name, status);
 
@@ -522,21 +522,21 @@ static void twitter_connected(PurpleAccount *account)
 	/* Immediately retrieve replies */
 
 	int get_friends_timer_timeout = twitter_option_user_status_timeout(account);
-	gboolean get_following = twitter_option_get_following(account);
 
-	/* Only update the buddy list if the user set the timeout to a positive number
-	 * and the user wants to retrieve his following list */
-	if (get_friends_timer_timeout > 0 && get_following)
+	//We will try to get all our friends' statuses, whether they're in the buddylist or not
+	if (get_friends_timer_timeout > 0)
 	{
 		twitter->get_friends_timer = purple_timeout_add_seconds(
 				60 * get_friends_timer_timeout,
 				twitter_get_friends_timeout, account);
+		if (!twitter_option_get_following(account) && twitter_option_cutoff_time(account) > 0)
+			twitter_get_friends_timeout(account);
 	} else {
 		twitter->get_friends_timer = 0;
 	}
 	if (twitter_option_cutoff_time(account) > 0)
-		twitter->update_presense_timer = purple_timeout_add_seconds(
-			TWITTER_UPDATE_PRESENCE_TIMEOUT * 60, twitter_update_presense_timeout, account);
+		twitter->update_presence_timer = purple_timeout_add_seconds(
+			TWITTER_UPDATE_PRESENCE_TIMEOUT * 60, twitter_update_presence_timeout, account);
 	twitter_init_auto_open_contexts(account);
 }
 static void twitter_get_friends_verify_connection_cb(TwitterRequestor *r,
@@ -1164,8 +1164,8 @@ static void twitter_close(PurpleConnection *gc)
 		g_hash_table_destroy(twitter->chat_contexts);
 	twitter->chat_contexts = NULL;
 
-	if (twitter->update_presense_timer)
-		purple_timeout_remove(twitter->update_presense_timer);
+	if (twitter->update_presence_timer)
+		purple_timeout_remove(twitter->update_presence_timer);
 
 	if (twitter->user_reply_id_table)
 		g_hash_table_destroy (twitter->user_reply_id_table);
@@ -1313,17 +1313,8 @@ static void twitter_set_status(PurpleAccount *account, PurpleStatus *status) {
 static void twitter_add_buddy(PurpleConnection *gc, PurpleBuddy *buddy,
 		PurpleGroup *group)
 {
-	//TODO
-	//For the time being, if the user doesn't want to automatically download all their
-	//friends (people they follow), just assume the friend is valid and set them online
-	PurpleAccount *account = purple_connection_get_account(gc);
-	if (!twitter_option_get_following(account) && twitter_option_cutoff_time(account) <= 0)
-	{
-		purple_prpl_got_user_status(account,
-				purple_buddy_get_name(buddy),
-				TWITTER_STATUS_ONLINE,
-				NULL);
-	}
+	//Perform the logic to decide whether this buddy will be online/offline
+	twitter_buddy_touch_state(buddy);
 }
 
 static void twitter_add_buddies(PurpleConnection *gc, GList *buddies,
