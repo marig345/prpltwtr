@@ -63,7 +63,7 @@ install: $(TARGETS)
 	done
 	for dir in 16 22 48; do \
 		(install -m 0755 -d $(PURPLE_PROTOCOL_PIXMAP_DIR)/$$dir && \
-		 install -m 0644 prpltwtr$$dir.png $(PURPLE_PROTOCOL_PIXMAP_DIR)/$$dir/prpltwtr.png ) \
+		 install -m 0644 data/prpltwtr$$dir.png $(PURPLE_PROTOCOL_PIXMAP_DIR)/$$dir/prpltwtr.png ) \
 	done
 
 uninstall: 

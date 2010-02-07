@@ -54,9 +54,9 @@ Section "MainSection" SEC01
     SetOverwrite try
     
 	SetOutPath "$PidginDir\pixmaps\pidgin"
-	File "/oname=protocols\16\prpltwtr.png" "prpltwtr16.png"
-	File "/oname=protocols\22\prpltwtr.png" "prpltwtr22.png"
-	File "/oname=protocols\48\prpltwtr.png" "prpltwtr48.png"
+	File "/oname=protocols\16\prpltwtr.png" "data\prpltwtr16.png"
+	File "/oname=protocols\22\prpltwtr.png" "data\prpltwtr22.png"
+	File "/oname=protocols\48\prpltwtr.png" "data\prpltwtr48.png"
 
 	;SetOutPath "$PidginDir\ca-certs"
 	;File "login.facebook.com.pem"
