@@ -33,6 +33,7 @@
 
 #include "twitter_charcount.h"
 #include "twitter_convicon.h"
+#include "twitter_tweetactions.h"
 
 
 static PurplePlugin *_twitter_protocol = NULL;
@@ -1132,6 +1133,7 @@ static void twitter_login(PurpleAccount *account)
 #if _HAVE_PIDGIN_
 	if (twitter_option_enable_conv_icon(account))
 		twitter_conv_icon_account_load(account);
+	twitter_tweet_actions_account_load(account);
 #endif
 
 	/* purple wants a minimum of 2 steps */
@@ -1194,6 +1196,7 @@ static void twitter_close(PurpleConnection *gc)
 
 #if _HAVE_PIDGIN_
 	twitter_conv_icon_account_unload(account);
+	twitter_tweet_actions_account_unload(account);
 #endif
 
 	if (twitter->oauth_token)
