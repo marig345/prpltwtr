@@ -11,9 +11,68 @@ typedef struct
 	long long tweet_id;
 } TwitterTweetAction;
 
+typedef struct
+{
+	PurpleConversationType type;
+	gchar *conv_name;
+} TwitterConversationId;
+
+static void twitter_send_rt_success_cb(TwitterRequestor *r,
+		xmlnode *node,
+		gpointer user_data)
+{
+	TwitterConversationId *conv_id = user_data;
+	PurpleConversation *conv;
+	g_return_if_fail(conv_id != NULL);
+
+	conv = purple_find_conversation_with_account(conv_id->type, conv_id->conv_name, r->account);
+
+	if (conv)
+	{
+		purple_conversation_write(conv, NULL, "Successfully retweeted", PURPLE_MESSAGE_SYSTEM, time(NULL));
+	}
+
+	g_free(conv_id->conv_name);
+	g_free(conv_id);
+}
+
+static void twitter_send_rt_error_cb(TwitterRequestor *r,
+		const TwitterRequestErrorData *error_data,
+		gpointer user_data)
+{
+	TwitterConversationId *conv_id = user_data;
+	PurpleConversation *conv;
+	g_return_if_fail(conv_id != NULL);
+
+	conv = purple_find_conversation_with_account(conv_id->type, conv_id->conv_name, r->account);
+
+	if (conv)
+	{
+		purple_conversation_write(conv, NULL, "Retweet failed", PURPLE_MESSAGE_ERROR, time(NULL));
+	}
+
+	g_free(conv_id->conv_name);
+	g_free(conv_id);
+}
+
+
 static void twitter_context_menu_retweet(GtkWidget *w, TwitterTweetAction *action_data)
 {
-	//twitter_got_uri_action(url, TWITTER_URI_ACTION_RT);
+	PurpleAccount *account;
+	TwitterConversationId *conv_id;
+	g_return_if_fail(action_data != NULL);
+
+	account = purple_conversation_get_account(action_data->conv);
+
+	conv_id = g_new0(TwitterConversationId, 1);
+	conv_id->conv_name = g_strdup(purple_conversation_get_name(action_data->conv));
+	conv_id->type = purple_conversation_get_type(action_data->conv);
+
+	twitter_api_send_rt(purple_account_get_requestor(account),
+			action_data->tweet_id,
+			twitter_send_rt_success_cb,
+			twitter_send_rt_error_cb,
+			conv_id);
 }
 
 static void twitter_context_menu_reply(GtkWidget *w, TwitterTweetAction *action_data)
