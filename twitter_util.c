@@ -110,6 +110,13 @@ static char *twitter_linkify(PurpleAccount *account, const char *message)
 #endif
 }
 
+/* TODO: Fix this. This is an awful hack */
+static long long last_formatted_tweet_id = 0;
+long long twitter_get_last_formatted_tweet_id()
+{
+	return last_formatted_tweet_id;
+}
+
 //TODO: move those
 char *twitter_format_tweet(PurpleAccount *account,
 		const char *src_user,
@@ -126,6 +133,9 @@ char *twitter_format_tweet(PurpleAccount *account,
 	g_return_val_if_fail(src_user != NULL, NULL);
 
 	tweet = g_string_new(linkified_message);
+
+	if (tweet_id)
+		last_formatted_tweet_id = tweet_id;
 
 #if _HAVE_PIDGIN_
 	if (is_tweet && tweet_id && conv_type != PURPLE_CONV_TYPE_UNKNOWN && conv_name)

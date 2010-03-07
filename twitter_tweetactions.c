@@ -2,17 +2,86 @@
 #if _HAVE_PIDGIN_
 
 #include "twitter_conn.h"
+#include "twitter_util.h"
+
+typedef struct
+{
+	PurpleConversation *conv;
+	char *who;
+	long long tweet_id;
+} TwitterTweetAction;
+
+static void twitter_context_menu_retweet(GtkWidget *w, TwitterTweetAction *action_data)
+{
+	//twitter_got_uri_action(url, TWITTER_URI_ACTION_RT);
+}
+
+static void twitter_context_menu_reply(GtkWidget *w, TwitterTweetAction *action_data)
+{
+	//twitter_got_uri_action(url, TWITTER_URI_ACTION_REPLY);
+}
+
+static void twitter_context_menu_link(GtkWidget *w, TwitterTweetAction *action_data)
+{
+	//twitter_got_uri_action(url, TWITTER_URI_ACTION_LINK);
+}
+
+
+static void twitter_url_menu_actions(GtkWidget *menu, TwitterTweetAction *action_data)
+{
+	GtkWidget *img, *item;
+
+	img = gtk_image_new_from_stock(GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU);
+	item = gtk_image_menu_item_new_with_mnemonic(("Retweet"));
+	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), img);
+	g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(twitter_context_menu_retweet), (gpointer)action_data);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+	img = gtk_image_new_from_stock(GTK_STOCK_REDO, GTK_ICON_SIZE_MENU);
+	item = gtk_image_menu_item_new_with_mnemonic(("Reply"));
+	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), img);
+	g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(twitter_context_menu_reply), (gpointer)action_data);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+	img = gtk_image_new_from_stock(GTK_STOCK_HOME, GTK_ICON_SIZE_MENU);
+	item = gtk_image_menu_item_new_with_mnemonic(("Goto Site"));
+	gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item), img);
+	g_signal_connect(G_OBJECT(item), "activate", G_CALLBACK(twitter_context_menu_link), (gpointer)action_data);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+}
 
 //TODO: 3rd param should be tweet data
-static gboolean twitter_tweet_action_icon_event(GtkWidget *w, GdkEvent *event, GtkIMHtml *imhtml)
+static gboolean twitter_tweet_action_icon_event(GtkWidget *w, GdkEvent *event, TwitterTweetAction *action)
 {
 	if (event->type == GDK_ENTER_NOTIFY)
 	{
+		GtkIMHtml *imhtml = GTK_IMHTML(PIDGIN_CONVERSATION(action->conv)->imhtml);
 		gdk_window_set_cursor(w->window, imhtml->hand_cursor);
 	} else if (event->type == GDK_BUTTON_RELEASE) {
-		//TODO: add actions
+		GtkWidget *menu = gtk_menu_new();
+		twitter_url_menu_actions(menu, action);
+		gtk_widget_show_all(menu);
+		gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL,
+				0, gtk_get_current_event_time());
 	}
 	return FALSE;
+}
+
+static void twitter_tweet_action_free(TwitterTweetAction *t)
+{
+	if (!t)
+		return;
+	g_free(t->who);
+	g_free(t);
+}
+
+static TwitterTweetAction *twitter_tweet_action_new(PurpleConversation *conv, const char *who, long long tweet_id)
+{
+	TwitterTweetAction *t = g_new(TwitterTweetAction, 1);
+	t->conv = conv;
+	t->who = g_strdup(who);
+	t->tweet_id = tweet_id;
+	return t;
 }
 
 static void twitter_tweet_actions_displayed_chat_cb(PurpleAccount *account, const char *who, char *message,
@@ -24,6 +93,7 @@ static void twitter_tweet_actions_displayed_chat_cb(PurpleAccount *account, cons
 	GtkTextBuffer *text_buffer;
 	GtkTextIter iter;
 	GtkWidget *box, *img;
+	TwitterTweetAction *action;
 
 	if (account != account_signal)
 		return;
@@ -34,6 +104,11 @@ static void twitter_tweet_actions_displayed_chat_cb(PurpleAccount *account, cons
 	gtk_text_buffer_get_end_iter(text_buffer, &iter);
 
 	box = gtk_event_box_new();
+	action = twitter_tweet_action_new(conv, who, twitter_get_last_formatted_tweet_id());
+	g_object_set_data_full(G_OBJECT(box),
+			TWITTER_PROTOCOL_ID "-action-data",
+			action,
+			(GDestroyNotify) twitter_tweet_action_free);
 	//TODO: cache this?
 	//TODO: text version
 	//TODO: change this image to something relevant
@@ -48,7 +123,7 @@ static void twitter_tweet_actions_displayed_chat_cb(PurpleAccount *account, cons
 	gtk_widget_show(img);
 
 	//TODO: need to pass tweet data here
-	g_signal_connect(G_OBJECT(box), "event", G_CALLBACK(twitter_tweet_action_icon_event), imhtml);
+	g_signal_connect(G_OBJECT(box), "event", G_CALLBACK(twitter_tweet_action_icon_event), action);
 
 }
 
