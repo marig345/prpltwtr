@@ -1278,7 +1278,8 @@ static void twitter_set_info(PurpleConnection *gc, const char *info) {
 			gc->account->username, info);
 }
 
-static void twitter_get_info(PurpleConnection *gc, const char *username) {
+static void twitter_get_info(PurpleConnection *gc, const char *username) 
+{
 	//TODO: error check
 	//TODO: fix for buddy not on list?
 	TwitterConnectionData *twitter = gc->proto_data;
@@ -1297,27 +1298,27 @@ static void twitter_get_info(PurpleConnection *gc, const char *username) {
 
 			if (user_data)
 			{
-				purple_notify_user_info_add_pair(info, "Description:", user_data->description);
+				purple_notify_user_info_add_pair(info, "Description", user_data->description);
 			}
 			if (status_data)
 			{
-				purple_notify_user_info_add_pair(info, "Status:", status_data->text);
+				purple_notify_user_info_add_pair(info, "Status", status_data->text);
 			}
 		}
 	} else {
-		purple_notify_user_info_add_pair(info, "Description:", "No user info");
+		purple_notify_user_info_add_pair(info, "Description", "No user info");
 	}
 	url = twitter_mb_prefs_get_user_profile_url(twitter->mb_prefs, username);
-	purple_notify_user_info_add_pair(info, "Account Link:", url);
+	purple_notify_user_info_add_pair(info, "Account Link", url);
 	if (url)
 	{
 		g_free(url);
 	}
 	purple_notify_userinfo(gc,
-		username,
-		info,
-		NULL,
-		NULL);
+			username,
+			info,
+			NULL,
+			NULL);
 
 }
 
