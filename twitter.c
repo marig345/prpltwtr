@@ -1326,7 +1326,7 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 				user_tweet->screen_name,
 				user_tweet->status->text,
 				user_tweet->status->id,
-				0,
+				PURPLE_CONV_TYPE_UNKNOWN,
 				NULL,
 				TRUE);
 		purple_notify_user_info_add_section_break(info);

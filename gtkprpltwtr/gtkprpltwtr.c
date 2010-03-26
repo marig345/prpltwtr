@@ -23,17 +23,23 @@ static void twitter_conv_id_write_message(PurpleAccount *account, TwitterConvers
 		PurpleMessageFlags flags, const gchar *message)
 {
 	PurpleConversation *conv;
-	g_return_if_fail(conv_id != NULL);
-
-	conv = purple_find_conversation_with_account(conv_id->type, conv_id->conv_name, account);
-
-	if (conv)
+	if (conv_id)
 	{
-		purple_conversation_write(conv, NULL, message, flags, time(NULL));
-	}
 
-	g_free(conv_id->conv_name);
-	g_free(conv_id);
+		conv = purple_find_conversation_with_account(conv_id->type, conv_id->conv_name, account);
+
+		if (conv)
+		{
+			purple_conversation_write(conv, NULL, message, flags, time(NULL));
+		}
+
+		g_free(conv_id->conv_name);
+		g_free(conv_id);
+	} else {
+		purple_notify_message(NULL,
+				PURPLE_MESSAGE_SYSTEM ? PURPLE_NOTIFY_MSG_INFO : PURPLE_NOTIFY_MSG_ERROR,
+				message, message, NULL, NULL, NULL);
+	}
 }
 
 static void twitter_send_rt_success_cb(TwitterRequestor *r,
@@ -171,9 +177,14 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 
 		conv_type = atoi(conv_type_str);
 
-		conv_id = g_new0(TwitterConversationId, 1);
-		conv_id->conv_name = g_strdup(purple_url_decode(conv_name_encoded));
-		conv_id->type = conv_type;
+		if (conv_type != PURPLE_CONV_TYPE_UNKNOWN && conv_name_encoded && conv_name_encoded[0] != '\0')
+		{
+			conv_id = g_new0(TwitterConversationId, 1);
+			conv_id->conv_name = g_strdup(purple_url_decode(conv_name_encoded));
+			conv_id->type = conv_type;
+		} else {
+			conv_id = NULL;
+		}
 		twitter_api_send_rt(purple_account_get_requestor(account),
 				id,
 				twitter_send_rt_success_cb,
@@ -233,9 +244,14 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 
 		conv_type = atoi(conv_type_str);
 
-		conv_id = g_new0(TwitterConversationId, 1);
-		conv_id->conv_name = g_strdup(purple_url_decode(conv_name_encoded));
-		conv_id->type = conv_type;
+		if (conv_type != PURPLE_CONV_TYPE_UNKNOWN && conv_name_encoded && conv_name_encoded[0] != '\0')
+		{
+			conv_id = g_new0(TwitterConversationId, 1);
+			conv_id->conv_name = g_strdup(purple_url_decode(conv_name_encoded));
+			conv_id->type = conv_type;
+		} else {
+			conv_id = NULL;
+		}
 		twitter_api_delete_status(purple_account_get_requestor(account),
 				id,
 				twitter_delete_tweet_success_cb,
@@ -555,7 +571,7 @@ static gchar *gtkprpltwtr_format_tweet_cb(PurpleAccount *account,
 
 	tweet = g_string_new(linkified_message);
 
-	if (is_tweet && tweet_id && conv_type != PURPLE_CONV_TYPE_UNKNOWN && conv_name)
+	if (is_tweet && tweet_id)
 	{
 		const gchar *account_name = purple_account_get_username(account);
 		//TODO: make this an image
@@ -567,7 +583,7 @@ static gchar *gtkprpltwtr_format_tweet_cb(PurpleAccount *account,
 		g_string_append_printf(tweet,
 				"&conv_type=%d&conv_name=%s\">*</a>",
 				conv_type,
-				purple_url_encode(conv_name));
+				conv_name ? purple_url_encode(conv_name) : "");
 	}
 
 	g_free(linkified_message);
