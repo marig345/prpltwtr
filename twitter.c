@@ -1278,16 +1278,12 @@ static void twitter_set_info(PurpleConnection *gc, const char *info) {
 			gc->account->username, info);
 }
 
-static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList *nodes, gpointer user_data)
+static PurpleNotifyUserInfo *twitter_get_notify_user_info_generic(PurpleAccount *account, const gchar *username)
 {
-	PurpleAccount *account = r->account;
 	PurpleConnection *gc = purple_account_get_connection(account);
-	gchar *username = user_data;
 	TwitterConnectionData *twitter = gc->proto_data;
 	PurpleNotifyUserInfo *info = purple_notify_user_info_new();
 	PurpleBuddy *b = purple_find_buddy(purple_connection_get_account(gc), username);
-	GList *statuses = twitter_statuses_nodes_parse(nodes);
-	GList *l;
 	gchar *url;
 
 	if (b)
@@ -1319,6 +1315,22 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 		g_free(url);
 	}
 
+	return info;
+}
+
+static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList *nodes, gpointer user_data)
+{
+	PurpleAccount *account = r->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	gchar *username = user_data;
+	PurpleNotifyUserInfo *info;
+	GList *statuses, *l;
+	info = twitter_get_notify_user_info_generic(account, username);
+
+	g_return_if_fail(info != NULL);
+
+	statuses = twitter_statuses_nodes_parse(nodes);
+
 	for (l = g_list_last(statuses); l; l = g_list_previous(l))
 	{
 		TwitterUserTweet *user_tweet = l->data;
@@ -1349,8 +1361,17 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 static gboolean twitter_get_info_user_timeline_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data)
 {
 	//TODO, show minimum known data
-	gchar *screen_name = user_data;
-	g_free(screen_name);
+	gchar *username = user_data;
+	PurpleNotifyUserInfo *info = twitter_get_notify_user_info_generic(r->account, username);
+
+	purple_notify_userinfo(purple_account_get_connection(r->account),
+			username,
+			info,
+			NULL,
+			NULL);
+	purple_notify_user_info_add_pair(info, "Tweets", "Error retrieving tweets");
+
+	g_free(username);
 	return FALSE;
 }
 
