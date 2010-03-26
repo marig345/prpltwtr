@@ -1278,13 +1278,16 @@ static void twitter_set_info(PurpleConnection *gc, const char *info) {
 			gc->account->username, info);
 }
 
-static void twitter_get_info(PurpleConnection *gc, const char *username) 
+static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList *nodes, gpointer user_data)
 {
-	//TODO: error check
-	//TODO: fix for buddy not on list?
+	PurpleAccount *account = r->account;
+	PurpleConnection *gc = purple_account_get_connection(account);
+	gchar *username = user_data;
 	TwitterConnectionData *twitter = gc->proto_data;
 	PurpleNotifyUserInfo *info = purple_notify_user_info_new();
 	PurpleBuddy *b = purple_find_buddy(purple_connection_get_account(gc), username);
+	GList *statuses = twitter_statuses_nodes_parse(nodes);
+	GList *l;
 	gchar *url;
 
 	if (b)
@@ -1308,17 +1311,61 @@ static void twitter_get_info(PurpleConnection *gc, const char *username)
 	} else {
 		purple_notify_user_info_add_pair(info, "Description", "No user info");
 	}
+
 	url = twitter_mb_prefs_get_user_profile_url(twitter->mb_prefs, username);
 	purple_notify_user_info_add_pair(info, "Account Link", url);
 	if (url)
 	{
 		g_free(url);
 	}
+
+	for (l = statuses; l; l = l->next)
+	{
+		TwitterUserTweet *user_tweet = l->data;
+		gchar *tweet = twitter_format_tweet(account,
+				user_tweet->screen_name,
+				user_tweet->status->text,
+				user_tweet->status->id,
+				0,
+				NULL,
+				TRUE);
+		purple_notify_user_info_add_section_break(info);
+		purple_notify_user_info_add_pair(info,
+				user_tweet->screen_name,
+				tweet);
+		g_free(tweet);
+		twitter_user_tweet_free(user_tweet);
+	}
+	g_list_free(statuses);
+
 	purple_notify_userinfo(gc,
 			username,
 			info,
 			NULL,
 			NULL);
+	g_free(username);
+}
+
+static gboolean twitter_get_info_user_timeline_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data)
+{
+	//TODO, show minimum known data
+	gchar *screen_name = user_data;
+	g_free(screen_name);
+	return FALSE;
+}
+
+static void twitter_get_info(PurpleConnection *gc, const char *username) 
+{
+	//TODO: error check
+	//TODO: fix for buddy not on list?
+	PurpleAccount *account = purple_connection_get_account(gc);
+	twitter_api_get_user_timeline_all(purple_account_get_requestor(account),
+			username,
+			0,
+			twitter_get_info_user_timeline_success_cb,
+			twitter_get_info_user_timeline_error_cb,
+			20, //TODO
+			g_strdup(username));
 
 }
 

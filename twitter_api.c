@@ -70,6 +70,11 @@ static const gchar *twitter_option_url_get_home_timeline(PurpleAccount *account)
 	return twitter_api_create_url(account,
 			TWITTER_PREF_URL_GET_HOME_TIMELINE);
 }
+static const gchar *twitter_option_url_get_user_timeline(PurpleAccount *account)
+{
+	return twitter_api_create_url(account,
+			TWITTER_PREF_URL_GET_USER_TIMELINE);
+}
 static const gchar *twitter_option_url_get_mentions(PurpleAccount *account)
 {
 	return twitter_api_create_url(account,
@@ -632,4 +637,28 @@ void twitter_api_verify_credentials(TwitterRequestor *r,
 			success_cb,
 			error_cb,
 			user_data);
+}
+
+void twitter_api_get_user_timeline_all(TwitterRequestor *r,
+		const gchar *user,
+		long long since_id,
+		TwitterSendRequestMultiPageAllSuccessFunc success_func,
+		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
+		gpointer data)
+{
+	TwitterRequestParams *params = twitter_request_params_new();
+
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
+
+	twitter_request_params_add(params, twitter_request_param_new("screen_name", user));
+	if (since_id > 0)
+		twitter_request_params_add(params, twitter_request_param_new_ll("since_id", since_id));
+
+
+	twitter_send_xml_request_multipage_all(r,
+			twitter_option_url_get_user_timeline(r->account), params,
+			success_func, error_func,
+			200, max_count, data);//TODO set var for 200
+	twitter_request_params_free(params);
 }

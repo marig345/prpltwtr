@@ -160,4 +160,12 @@ void twitter_api_oauth_access_token(TwitterRequestor *r,
 		TwitterSendRequestErrorFunc error_cb,
 		gpointer user_data);
 
+void twitter_api_get_user_timeline_all(TwitterRequestor *r,
+		const gchar *user,
+		long long since_id,
+		TwitterSendRequestMultiPageAllSuccessFunc success_func,
+		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		gint max_count,
+		gpointer data);
+
 #endif
