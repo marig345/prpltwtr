@@ -1319,7 +1319,7 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 		g_free(url);
 	}
 
-	for (l = statuses; l; l = l->next)
+	for (l = g_list_last(statuses); l; l = g_list_previous(l))
 	{
 		TwitterUserTweet *user_tweet = l->data;
 		gchar *tweet = twitter_format_tweet(account,
