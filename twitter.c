@@ -1284,6 +1284,7 @@ static PurpleNotifyUserInfo *twitter_get_notify_user_info_generic(PurpleAccount 
 	TwitterConnectionData *twitter = gc->proto_data;
 	PurpleNotifyUserInfo *info = purple_notify_user_info_new();
 	gchar *url;
+	gboolean show_saved_tweet = user_tweet == NULL;
 
 	if (!user_tweet)
 	{
@@ -1300,11 +1301,22 @@ static PurpleNotifyUserInfo *twitter_get_notify_user_info_generic(PurpleAccount 
 
 		if (user_data)
 		{
+			purple_notify_user_info_add_pair(info, "Name", user_data->name);
+			purple_notify_user_info_add_pair(info, "Location", user_data->location);
+			purple_notify_user_info_add_pair(info, "Web", user_data->url);
 			purple_notify_user_info_add_pair(info, "Description", user_data->description);
 		}
-		if (status_data)
+		if (show_saved_tweet && status_data)
 		{
-			purple_notify_user_info_add_pair(info, "Status", status_data->text);
+			gchar *tweet = twitter_format_tweet(account,
+					user_tweet->screen_name,
+					status_data->text,
+					status_data->id,
+					PURPLE_CONV_TYPE_UNKNOWN,
+					NULL,
+					TRUE);
+			purple_notify_user_info_add_pair(info, "Status", tweet);
+			g_free(tweet);
 		}
 	} else {
 		purple_notify_user_info_add_pair(info, "Description", "No user info");
