@@ -1348,6 +1348,8 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 	for (; l; l = g_list_previous(l))
 	{
 		TwitterUserTweet *user_tweet = l->data;
+		const gchar *time;
+		struct tm *tm;
 		gchar *tweet = twitter_format_tweet(account,
 				user_tweet->screen_name,
 				user_tweet->status->text,
@@ -1355,9 +1357,12 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 				PURPLE_CONV_TYPE_UNKNOWN,
 				NULL,
 				TRUE);
+
+		tm = localtime(&user_tweet->status->created_at);
+		time = purple_date_format_long(tm);
 		purple_notify_user_info_add_section_break(info);
 		purple_notify_user_info_add_pair(info,
-				user_tweet->screen_name,
+				time,
 				tweet);
 		g_free(tweet);
 		twitter_user_tweet_free(user_tweet);
