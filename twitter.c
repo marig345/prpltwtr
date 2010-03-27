@@ -1278,31 +1278,33 @@ static void twitter_set_info(PurpleConnection *gc, const char *info) {
 			gc->account->username, info);
 }
 
-static PurpleNotifyUserInfo *twitter_get_notify_user_info_generic(PurpleAccount *account, const gchar *username)
+static PurpleNotifyUserInfo *twitter_get_notify_user_info_generic(PurpleAccount *account, const gchar *username, TwitterUserTweet *user_tweet)
 {
 	PurpleConnection *gc = purple_account_get_connection(account);
 	TwitterConnectionData *twitter = gc->proto_data;
 	PurpleNotifyUserInfo *info = purple_notify_user_info_new();
-	PurpleBuddy *b = purple_find_buddy(purple_connection_get_account(gc), username);
 	gchar *url;
 
-	if (b)
+	if (!user_tweet)
 	{
-		TwitterUserTweet *data = twitter_buddy_get_buddy_data(b);
-		if (data)
+		PurpleBuddy *b = purple_find_buddy(purple_connection_get_account(gc), username);
+		if (b)
+			user_tweet = twitter_buddy_get_buddy_data(b);
+	}
+
+	if (user_tweet)
+	{
+		TwitterUserData *user_data = user_tweet->user;
+		TwitterTweet *status_data = user_tweet->status;
+
+
+		if (user_data)
 		{
-			TwitterUserData *user_data = data->user;
-			TwitterTweet *status_data = data->status;
-
-
-			if (user_data)
-			{
-				purple_notify_user_info_add_pair(info, "Description", user_data->description);
-			}
-			if (status_data)
-			{
-				purple_notify_user_info_add_pair(info, "Status", status_data->text);
-			}
+			purple_notify_user_info_add_pair(info, "Description", user_data->description);
+		}
+		if (status_data)
+		{
+			purple_notify_user_info_add_pair(info, "Status", status_data->text);
 		}
 	} else {
 		purple_notify_user_info_add_pair(info, "Description", "No user info");
@@ -1325,13 +1327,13 @@ static void twitter_get_info_user_timeline_success_cb(TwitterRequestor *r, GList
 	gchar *username = user_data;
 	PurpleNotifyUserInfo *info;
 	GList *statuses, *l;
-	info = twitter_get_notify_user_info_generic(account, username);
-
-	g_return_if_fail(info != NULL);
 
 	statuses = twitter_statuses_nodes_parse(nodes);
 
-	for (l = g_list_last(statuses); l; l = g_list_previous(l))
+	l = g_list_last(statuses);
+	info = twitter_get_notify_user_info_generic(account, username, l ? l->data : NULL);
+
+	for (; l; l = g_list_previous(l))
 	{
 		TwitterUserTweet *user_tweet = l->data;
 		gchar *tweet = twitter_format_tweet(account,
@@ -1362,7 +1364,7 @@ static gboolean twitter_get_info_user_timeline_error_cb(TwitterRequestor *r, con
 {
 	//TODO, show minimum known data
 	gchar *username = user_data;
-	PurpleNotifyUserInfo *info = twitter_get_notify_user_info_generic(r->account, username);
+	PurpleNotifyUserInfo *info = twitter_get_notify_user_info_generic(r->account, username, NULL);
 
 	purple_notify_userinfo(purple_account_get_connection(r->account),
 			username,
@@ -1480,8 +1482,8 @@ static void twitter_blist_chat_auto_open_toggle(PurpleBlistNode *node, gpointer 
 
 	//If no conversation exists and we've set this to NOT auto open, let's free some memory
 	if (!new_state 
-		&& !purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)
-		&& (ctx = twitter_endpoint_chat_find(account, chat_name)))
+			&& !purple_find_conversation_with_account(PURPLE_CONV_TYPE_CHAT, chat_name, account)
+			&& (ctx = twitter_endpoint_chat_find(account, chat_name)))
 
 	{
 		TwitterConnectionData *twitter = purple_account_get_connection(account)->proto_data;
@@ -1525,7 +1527,7 @@ static GList *twitter_blist_node_menu(PurpleBlistNode *node) {
 	if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
 		PurpleChat *chat = PURPLE_CHAT(node);
 		char *label = g_strdup_printf("Automatically open chat on new tweets (Currently: %s)",
-			(twitter_blist_chat_is_auto_open(chat) ? "On" : "Off"));
+				(twitter_blist_chat_is_auto_open(chat) ? "On" : "Off"));
 
 		PurpleMenuAction *action = purple_menu_action_new(
 				label,
