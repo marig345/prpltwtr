@@ -119,10 +119,14 @@ static gboolean twitter_uri_handler(const char *proto, const char *cmd_arg, GHas
 	purple_debug_info(DEBUG_ID, "Account %s got action %s\n", username, cmd_arg);
 	if (!strcmp(cmd_arg, TWITTER_URI_ACTION_USER))
 	{
-		purple_notify_info(purple_account_get_connection(account),
-				"Clicked URI",
-				"@name clicked",
-				"Sorry, this has not been implemented yet");
+		const gchar *username;
+		const gchar *text = g_hash_table_lookup(params, "text");
+		g_return_val_if_fail(text != NULL, FALSE);
+
+		username = purple_url_decode(text);
+		if (username[0] == '@')
+			username++;
+		serv_get_info(purple_account_get_connection(account), username);
 	} else if (!strcmp(cmd_arg, TWITTER_URI_ACTION_REPLY)) {
 		const char *id_str, *user;
 		long long id;
