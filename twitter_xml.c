@@ -235,6 +235,8 @@ TwitterUserData *twitter_user_node_parse(xmlnode *user_node)
 	user->name = xmlnode_get_child_data(user_node, "name");
 	user->profile_image_url = xmlnode_get_child_data(user_node, "profile_image_url");
 	user->description = xmlnode_get_child_data(user_node, "description");
+	user->location = xmlnode_get_child_data(user_node, "location");
+	user->url = xmlnode_get_child_data(user_node, "url");
 
 	return user;
 }
