@@ -240,15 +240,11 @@ static void twitter_buddy_datas_set_all(PurpleAccount *account, GList *buddy_dat
 			twitter_buddy_set_user_data(account, user, twitter_option_get_following(account));
 		if (status)
 			twitter_buddy_set_status_data(account, data->screen_name, status);
-
-		twitter_user_tweet_free(data);
 	}
-	g_list_free(buddy_datas);
 }
 
-static void twitter_get_friends_cb(TwitterRequestor *r, GList *nodes, gpointer user_data)
+static void twitter_get_friends_cb(TwitterRequestor *r, GList *buddy_datas, gpointer user_data)
 {
-	GList *buddy_datas = twitter_users_nodes_parse(nodes);
 	twitter_buddy_datas_set_all(r->account, buddy_datas);
 }
 
@@ -518,20 +514,17 @@ static void twitter_connected(PurpleAccount *account)
 	twitter_init_auto_open_contexts(account);
 }
 static void twitter_get_friends_verify_connection_cb(TwitterRequestor *r,
-		GList *nodes,
+		GList *buddy_datas,
 		gpointer user_data)
 {
 	PurpleConnection *gc = purple_account_get_connection(r->account);
-	GList *l_users_data = NULL;
 
 	if (purple_connection_get_state(gc) == PURPLE_CONNECTING)
 	{
 		twitter_connected(r->account);
 
-		l_users_data = twitter_users_nodes_parse(nodes);
-
 		/* setup buddy list */
-		twitter_buddy_datas_set_all(r->account, l_users_data);
+		twitter_buddy_datas_set_all(r->account, buddy_datas);
 
 	}
 }

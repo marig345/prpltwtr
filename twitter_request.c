@@ -75,13 +75,17 @@ typedef struct
 } TwitterMultiPageAllRequestData;
 
 typedef struct {
-	GList *nodes;
 	long long next_cursor;
 	gchar *url;
 	TwitterRequestParams *params;
 
 	TwitterSendRequestMultiPageAllSuccessFunc success_callback;
 	TwitterSendRequestMultiPageAllErrorFunc error_callback;
+
+	GList *results;
+	TwitterSendRequestMultiPageAllParseFunc parse_results;
+	TwitterSendRequestMultiPageAllFreeFunc free_results;
+
 	gpointer user_data;
 } TwitterRequestWithCursorData;
 
@@ -522,6 +526,26 @@ void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 			request_data);
 }
 
+void twitter_send_xml_request_parsed(TwitterRequestor *r, gboolean post,
+		const char *url, TwitterRequestParams *params,
+		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		gpointer data)
+{
+
+	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
+	request_data->user_data = data;
+	request_data->success_func = success_callback;
+	request_data->error_func = error_callback;
+
+	twitter_send_request(r,
+			post,
+			url,
+			params,
+			twitter_xml_request_success_cb,
+			twitter_xml_request_error_cb,
+			request_data);
+}
+
 static long long twitter_oauth_generate_nonce()
 {
 	static long long nonce = 0;
@@ -825,11 +849,8 @@ void twitter_send_xml_request_multipage_all(TwitterRequestor *r,
 static void twitter_request_with_cursor_data_free (
 		TwitterRequestWithCursorData *request_data)
 {
-	GList *l;
-
-	for (l = request_data->nodes; l; l = l->next)
-		xmlnode_free (l->data);
-	g_list_free (request_data->nodes);
+	if (request_data->free_results)
+		request_data->free_results(request_data->results);
 	g_free (request_data->url);
 	twitter_request_params_free(request_data->params);
 	g_slice_free (TwitterRequestWithCursorData, request_data);
@@ -858,14 +879,14 @@ static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s next_cursor: %lld\n",
 			G_STRFUNC, request_data->next_cursor);
 
+	//TODO: this should be generic and not reference users
 	users = xmlnode_get_child (node, "users");
 	if (!users && node->name && !strcmp(node->name, "users"))
 		users = node;
 
 	if (users) 
 	{
-		request_data->nodes = g_list_prepend (request_data->nodes,
-				xmlnode_copy (users));
+		request_data->results = g_list_concat(request_data->parse_results(users), request_data->results);
 	}
 
 	if (request_data->next_cursor) {
@@ -883,9 +904,9 @@ static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 	}
 	else {
 		request_data->success_callback(r,
-				request_data->nodes,
+				request_data->results,
 				request_data->user_data);
-		twitter_request_with_cursor_data_free (request_data);
+		twitter_request_with_cursor_data_free(request_data);
 	}
 }
 
@@ -910,6 +931,8 @@ void twitter_send_xml_request_with_cursor(TwitterRequestor *r,
 		const char *url, TwitterRequestParams *params, long long cursor,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
+		TwitterSendRequestMultiPageAllParseFunc parse_results,
+		TwitterSendRequestMultiPageAllFreeFunc free_results,
 		gpointer data)
 {
 	int len;
@@ -922,6 +945,8 @@ void twitter_send_xml_request_with_cursor(TwitterRequestor *r,
 	request_data->success_callback = success_callback;
 	request_data->error_callback = error_callback;
 	request_data->user_data = data;
+	request_data->parse_results = parse_results ? parse_results : twitter_xmlnode_to_glist;
+	request_data->free_results = free_results || parse_results ? free_results : twitter_xmlnode_glist_free;
 
 	len = request_data->params->len;
 	twitter_request_params_add(request_data->params,
