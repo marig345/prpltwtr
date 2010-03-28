@@ -126,7 +126,6 @@ static void _process_replies (PurpleAccount *account,
 			g_hash_table_insert (twitter->user_reply_id_table,
 					g_strdup (data->screen_name), reply_id);
 		}
-		twitter_user_tweet_free(data);
 	}
 
 	twitter->failed_get_replies_count = 0;
@@ -134,16 +133,13 @@ static void _process_replies (PurpleAccount *account,
 
 
 static void twitter_get_replies_all_cb(TwitterRequestor *r,
-		GList *nodes,
+		GList *statuses,
 		gpointer user_data)
 {
 	PurpleConnection *gc = purple_account_get_connection(r->account);
 	TwitterConnectionData *twitter = gc->proto_data;
 
-	GList *statuses = twitter_statuses_nodes_parse(nodes);
 	_process_replies(r->account, statuses, twitter);
-
-	g_list_free(statuses);
 }
 
 static void twitter_get_replies_get_last_since_id_success_cb(TwitterRequestor *requestor, xmlnode *node, gpointer user_data)

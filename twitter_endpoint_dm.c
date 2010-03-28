@@ -63,21 +63,17 @@ static void _process_dms(PurpleAccount *account,
 			twitter_status_data_update_conv(ctx, data->screen_name, status);
 			twitter_status_data_free(status);
 		}
-		twitter_user_tweet_free(data);
 	}
 }
 
 static void twitter_get_dms_all_cb(TwitterRequestor *r,
-		GList *nodes,
+		GList *dms,
 		gpointer user_data)
 {
 	PurpleConnection *gc = purple_account_get_connection(r->account);
 	TwitterConnectionData *twitter = gc->proto_data;
 
-	GList *dms = twitter_dms_nodes_parse(nodes);
 	_process_dms(r->account, dms, twitter);
-
-	g_list_free(dms);
 }
 
 
