@@ -44,17 +44,16 @@ typedef struct {
 } TwitterSearchContext;
 
 
-static void twitter_send_search_success_cb(TwitterRequestor *r, xmlnode *response_node, gpointer user_data)
+static void twitter_send_search_success_cb(TwitterRequestor *r, gpointer _results, gpointer user_data)
 {
+	TwitterSearchResults *results = _results;
 	TwitterSearchContext *ctx = user_data;
-	TwitterSearchResults *results = twitter_search_results_node_parse(response_node);
 
 	ctx->success_func(r->account, results->tweets,
 			results->refresh_url, results->max_id, ctx->user_data);
 
 	results->tweets = NULL;
 
-	twitter_search_results_free(results);
 	g_slice_free (TwitterSearchContext, ctx);
 }
 
@@ -73,6 +72,8 @@ void twitter_search(TwitterRequestor *r, TwitterRequestParams *params,
 		twitter_send_xml_request(r, FALSE,
 				search_url, params,
 				twitter_send_search_success_cb, NULL, //TODO error
+				(TwitterSendXmlRequestParseFunc) twitter_search_results_node_parse,
+				(TwitterSendXmlRequestFreeFunc) twitter_search_results_free,
 				ctx);
 
 	}

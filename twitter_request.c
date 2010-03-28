@@ -55,8 +55,10 @@ typedef struct {
 } TwitterSendRequestData;
 
 typedef struct {
-	TwitterSendXmlRequestSuccessFunc success_func;
+	TwitterSendXmlRequestParsedSuccessFunc success_func;
 	TwitterSendRequestErrorFunc error_func;
+	TwitterSendXmlRequestParseFunc parse_result;
+	TwitterSendXmlRequestFreeFunc free_result;
 	gpointer user_data;
 } TwitterSendXmlRequestData;
 
@@ -482,9 +484,13 @@ static void twitter_xml_request_success_cb(TwitterRequestor *r, const gchar *res
 
 		g_free(error_data);
 	} else {
+		gpointer results;
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Valid response, calling success func\n");
+		results = request_data->parse_result ? request_data->parse_result(response_node) : response_node;
 		if (request_data->success_func)
-			request_data->success_func(r, response_node, request_data->user_data);
+			request_data->success_func(r, results, request_data->user_data);
+		if (request_data->free_result)
+			request_data->free_result(results);
 	}
 
 	if (response_node != NULL)
@@ -508,34 +514,16 @@ static void twitter_xml_request_error_cb(TwitterRequestor *r, const TwitterReque
 
 void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 		const char *url, TwitterRequestParams *params,
-		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		TwitterSendXmlRequestParsedSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		TwitterSendXmlRequestParseFunc parse_result, TwitterSendXmlRequestFreeFunc free_result,
 		gpointer data)
 {
-
 	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
 	request_data->user_data = data;
 	request_data->success_func = success_callback;
 	request_data->error_func = error_callback;
-
-	twitter_send_request(r,
-			post,
-			url,
-			params,
-			twitter_xml_request_success_cb,
-			twitter_xml_request_error_cb,
-			request_data);
-}
-
-void twitter_send_xml_request_parsed(TwitterRequestor *r, gboolean post,
-		const char *url, TwitterRequestParams *params,
-		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
-		gpointer data)
-{
-
-	TwitterSendXmlRequestData *request_data = g_new0(TwitterSendXmlRequestData, 1);
-	request_data->user_data = data;
-	request_data->success_func = success_callback;
-	request_data->error_func = error_callback;
+	request_data->parse_result = parse_result;
+	request_data->free_result = free_result;
 
 	twitter_send_request(r,
 			post,
@@ -733,7 +721,8 @@ void twitter_send_xml_request_multipage_do(TwitterRequestor *r,
 
 	twitter_send_xml_request(r, FALSE,
 			request_data->url, request_data->params,
-			twitter_send_xml_request_multipage_cb, twitter_send_xml_request_multipage_error_cb,
+			(TwitterSendXmlRequestParsedSuccessFunc) twitter_send_xml_request_multipage_cb, twitter_send_xml_request_multipage_error_cb,
+			NULL, NULL,
 			request_data);
 	twitter_request_params_set_size(request_data->params, len);
 }
@@ -896,8 +885,9 @@ static void twitter_send_xml_request_with_cursor_cb(TwitterRequestor *r,
 
 		twitter_send_xml_request(r, FALSE,
 				request_data->url, request_data->params,
-				twitter_send_xml_request_with_cursor_cb,
+				(TwitterSendXmlRequestParsedSuccessFunc) twitter_send_xml_request_with_cursor_cb,
 				twitter_send_xml_request_with_cursor_error_cb,
+				NULL, NULL,
 				request_data);
 
 		twitter_request_params_set_size(request_data->params, len);
@@ -919,8 +909,9 @@ static void twitter_send_xml_request_with_cursor_error_cb(TwitterRequestor *r,
 	{
 		twitter_send_xml_request(r, FALSE,
 				request_data->url, request_data->params,
-				twitter_send_xml_request_with_cursor_cb,
+				(TwitterSendXmlRequestParsedSuccessFunc) twitter_send_xml_request_with_cursor_cb,
 				twitter_send_xml_request_with_cursor_error_cb,
+				NULL, NULL,
 				request_data);
 		return;
 	}
@@ -954,8 +945,9 @@ void twitter_send_xml_request_with_cursor(TwitterRequestor *r,
 
 	twitter_send_xml_request(r, FALSE,
 			url, request_data->params,
-			twitter_send_xml_request_with_cursor_cb,
+			(TwitterSendXmlRequestParsedSuccessFunc) twitter_send_xml_request_with_cursor_cb,
 			twitter_send_xml_request_with_cursor_error_cb,
+			NULL, NULL,
 			request_data);
 
 	twitter_request_params_set_size(request_data->params, len);
