@@ -350,6 +350,16 @@ void twitter_user_tweet_free(TwitterUserTweet *ut)
 	g_free(ut);
 }
 
+void twitter_user_tweets_free(GList *tweets)
+{
+	GList *l;
+	for (l = tweets; l; l = l->next)
+	{
+		twitter_user_tweet_free(l->data);
+	}
+	g_list_free(tweets);
+}
+
 GList *twitter_dms_node_parse(xmlnode *dms_node)
 {
 	GList *dms = NULL;
