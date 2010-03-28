@@ -139,7 +139,9 @@ void twitter_api_get_friends(TwitterRequestor *r,
 
 	twitter_send_xml_request_with_cursor(r,
 			twitter_option_url_get_friends(r->account), NULL, -1,
-			success_func, error_func, data);
+			success_func, error_func,
+			twitter_users_node_parse, twitter_user_tweets_free,
+			data);
 }
 
 static void twitter_api_send_request_single(TwitterRequestor *r,
