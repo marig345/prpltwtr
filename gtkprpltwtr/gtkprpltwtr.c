@@ -3,6 +3,7 @@
 #include <gtkplugin.h>
 #include <gtkconv.h>
 #include <gtkimhtml.h>
+#include <gtknotify.h>
 #include "../twitter.h"
 #include "gtkprpltwtr_prefs.h"
 #include "twitter_charcount.h"
@@ -595,6 +596,57 @@ static gchar *gtkprpltwtr_format_tweet_cb(PurpleAccount *account,
 }
 #endif
 
+static void gtkprpltwtr_userinfo_end_user_action(GtkTextBuffer *textbuffer, gpointer user_data)
+{
+	GtkIMHtml *imhtml = user_data;
+	g_signal_handlers_disconnect_matched(textbuffer,
+			G_SIGNAL_MATCH_FUNC,
+			0,
+			0,
+			NULL,
+			G_CALLBACK(gtkprpltwtr_userinfo_end_user_action),
+			imhtml);
+	//TODO: prepend icon
+}
+
+static void gtkprpltwtr_displaying_userinfo(PurpleAccount *account, const gchar *who, PurpleNotifyUserInfo *user_info)
+{
+	/* This works because of how pidgin caches notification windows
+	 * We'll tell pidgin to create the window, and connect to a signal
+	 * to know when it's done creating the user notification
+	 * and finally add our icon
+	 */
+	PurpleNotifyUiOps *ops = pidgin_notify_get_ui_ops();
+	void *window;
+	GtkIMHtml *imhtml;
+	PurpleNotifyUserInfo *info;
+	GtkTextBuffer *text_buffer;
+	GList *entries; 
+
+	g_return_if_fail(ops != NULL);
+
+	if (strcmp(purple_account_get_protocol_id(account), TWITTER_PROTOCOL_ID))
+		return;
+
+	/* Check to see if this is the correct user info (Not the Retrieving... text) */
+	entries = purple_notify_user_info_get_entries(user_info);
+	if (!entries || strcmp("Name", purple_notify_user_info_entry_get_label(entries->data)))
+		return;
+
+	/* Create a new user info, since it'll be more efficient than to regenerate the text
+	 * for the user info twice */
+	info = purple_notify_user_info_new();
+	window = ops->notify_userinfo(purple_account_get_connection(account), who, info);
+	purple_notify_user_info_destroy(info);
+
+	if (!window)
+		return;
+
+	imhtml = GTK_IMHTML(g_object_get_data(G_OBJECT(window), "info-widget"));
+	text_buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(imhtml));
+	g_signal_connect(G_OBJECT(text_buffer), "end-user-action", G_CALLBACK(gtkprpltwtr_userinfo_end_user_action), imhtml);
+}
+
 static void gtkprpltwtr_enable_conv_icon()
 {
 	purple_signal_connect(purple_buddy_icons_get_handle(),
@@ -603,6 +655,11 @@ static void gtkprpltwtr_enable_conv_icon()
 	purple_signal_connect(purple_buddy_icons_get_handle(),
 			"prpltwtr-update-iconurl",
 			gtkprpltwtr_plugin, PURPLE_CALLBACK(gtkprpltwtr_update_iconurl_cb), NULL);
+
+	purple_signal_connect(purple_notify_get_handle(),
+			"displaying-userinfo",
+			gtkprpltwtr_plugin, PURPLE_CALLBACK(gtkprpltwtr_displaying_userinfo), NULL);
+
 	gtkprpltwtr_enable_conv_icon_all_accounts();
 }
 
