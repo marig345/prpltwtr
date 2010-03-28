@@ -98,12 +98,11 @@ static void twitter_get_home_timeline_cb(TwitterRequestor *r, xmlnode *node, gpo
 }
 
 static void twitter_get_home_timeline_all_cb(TwitterRequestor *r,
-		GList *nodes,
+		GList *statuses,
 		gpointer user_data)
 {
 	TwitterEndpointChatId *chat_id = (TwitterEndpointChatId *)user_data;
 	TwitterEndpointChat *endpoint_chat;
-	GList *statuses;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -114,38 +113,7 @@ static void twitter_get_home_timeline_all_cb(TwitterRequestor *r,
 	if (endpoint_chat == NULL)
 		return;
 
-	statuses = twitter_statuses_nodes_parse(nodes);
 	twitter_get_home_timeline_parse_statuses(endpoint_chat, statuses);
-}
-static gboolean twitter_endpoint_timeline_interval_start(TwitterEndpointChat *endpoint)
-{
-	PurpleAccount *account = endpoint->account;
-	PurpleConnection *gc = purple_account_get_connection(account);
-	TwitterEndpointChatId *chat_id = twitter_endpoint_chat_id_new(endpoint);
-	long long since_id = twitter_connection_get_last_home_timeline_id(gc);
-
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s creating new timeline context\n", account->username);
-
-	if (since_id == 0)
-	{
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", gc->account->username);
-		twitter_api_get_home_timeline(purple_account_get_requestor(account),
-				since_id,
-				TWITTER_HOME_TIMELINE_INITIAL_COUNT,
-				1,
-				twitter_get_home_timeline_cb,
-				NULL,
-				chat_id);
-	} else {
-		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses since %lld\n", gc->account->username, since_id);
-		twitter_api_get_home_timeline_all(purple_account_get_requestor(account),
-				since_id,
-				twitter_get_home_timeline_all_cb,
-				NULL,
-				twitter_option_home_timeline_max_tweets(account),
-				chat_id);
-	}
-	return TRUE;
 }
 static gboolean twitter_timeline_timeout(TwitterEndpointChat *endpoint_chat)
 {
@@ -158,7 +126,7 @@ static gboolean twitter_timeline_timeout(TwitterEndpointChat *endpoint_chat)
 		purple_debug_info(TWITTER_PROTOCOL_ID, "Retrieving %s statuses for first time\n", account->username);
 		twitter_api_get_home_timeline(purple_account_get_requestor(account),
 				since_id,
-				20,
+				TWITTER_HOME_TIMELINE_INITIAL_COUNT,
 				1,
 				twitter_get_home_timeline_cb,
 				NULL,
@@ -173,6 +141,11 @@ static gboolean twitter_timeline_timeout(TwitterEndpointChat *endpoint_chat)
 				chat_id);
 	}
 
+	return TRUE;
+}
+static gboolean twitter_endpoint_timeline_interval_start(TwitterEndpointChat *endpoint_chat)
+{
+	twitter_timeline_timeout(endpoint_chat);
 	return TRUE;
 }
 

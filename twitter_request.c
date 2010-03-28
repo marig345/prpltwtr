@@ -62,9 +62,13 @@ typedef struct {
 
 typedef struct
 {
-	GList *nodes;
 	TwitterSendRequestMultiPageAllSuccessFunc success_callback;
 	TwitterSendRequestMultiPageAllErrorFunc error_callback;
+
+	GList *results;
+	TwitterSendRequestMultiPageAllParseFunc parse_results;
+	TwitterSendRequestMultiPageAllFreeFunc free_results;
+
 	gint max_count;
 	gint current_count;
 	gpointer user_data;
@@ -403,6 +407,7 @@ gpointer twitter_requestor_send(TwitterRequestor *r,
 {
 	gpointer request;
 	gchar *querystring = twitter_request_params_to_string(params);
+
 	request = twitter_send_request_querystring(r, post, url, querystring, header_fields, success_callback, error_callback, data);
 	g_free(querystring);
 	return request;
@@ -730,12 +735,8 @@ void twitter_send_xml_request_multipage(TwitterRequestor *r,
 
 static void twitter_multipage_all_request_data_free(TwitterMultiPageAllRequestData *request_data_all)
 {
-	GList *l = request_data_all->nodes;
-	for (l = request_data_all->nodes; l; l = l->next)
-	{
-		xmlnode_free(l->data);
-	}
-	g_list_free(request_data_all->nodes);
+	if (request_data_all->free_results)
+		request_data_all->free_results(request_data_all->results);
 	g_free(request_data_all);
 }
 
@@ -749,13 +750,13 @@ static gboolean twitter_send_xml_request_multipage_all_success_cb(TwitterRequest
 
 	purple_debug_info (TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
-	request_data_all->nodes = g_list_prepend(request_data_all->nodes, xmlnode_copy(node)); //TODO: update
+	request_data_all->results = g_list_concat(request_data_all->parse_results(node), request_data_all->results);
 	request_data_all->current_count += xmlnode_child_count(node);
 
-	purple_debug_info (TWITTER_PROTOCOL_ID, "%s last_page: %d current_count: %d max_count: %d per page: %d\n", G_STRFUNC, last_page ? 1 : 0, request_data_all->current_count, request_data_all->max_count, request_multi->expected_count);
+	purple_debug_info(TWITTER_PROTOCOL_ID, "%s last_page: %d current_count: %d max_count: %d per page: %d\n", G_STRFUNC, last_page ? 1 : 0, request_data_all->current_count, request_data_all->max_count, request_multi->expected_count);
 	if (last_page || (request_data_all->max_count > 0 && request_data_all->current_count >= request_data_all->max_count))
 	{
-		request_data_all->success_callback(r, request_data_all->nodes, request_data_all->user_data);
+		request_data_all->success_callback(r, request_data_all->results, request_data_all->user_data);
 		twitter_multipage_all_request_data_free(request_data_all);
 		return FALSE;
 	} else if (request_data_all->max_count > 0 && (request_data_all->current_count + request_multi->expected_count > request_data_all->max_count)) {
@@ -773,18 +774,36 @@ static gboolean twitter_send_xml_request_multipage_all_error_cb(TwitterRequestor
 	return FALSE;
 }
 
+static GList *twitter_xmlnode_to_glist(xmlnode *node)
+{
+	return g_list_append(NULL, xmlnode_copy(node));
+}
+static void twitter_xmlnode_glist_free(GList *nodes)
+{
+	GList *l;
+	for (l = nodes; l; l = l->next)
+	{
+		xmlnode_free(l->data);
+	}
+	g_list_free(nodes);
+}
+
 void twitter_send_xml_request_multipage_all(TwitterRequestor *r,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
+		TwitterSendRequestMultiPageAllParseFunc parse_results,
+		TwitterSendRequestMultiPageAllFreeFunc free_results,
 		int expected_count, gint max_count, gpointer data)
 {
 	TwitterMultiPageAllRequestData *request_data_all = g_new0(TwitterMultiPageAllRequestData, 1);
 	request_data_all->success_callback = success_callback;
 	request_data_all->error_callback = error_callback;
-	request_data_all->nodes = NULL;
+	request_data_all->results = NULL;
 	request_data_all->user_data = data;
 	request_data_all->max_count = max_count;
+	request_data_all->parse_results = parse_results ? parse_results : twitter_xmlnode_to_glist;
+	request_data_all->free_results = free_results || parse_results ? free_results : twitter_xmlnode_glist_free;
 
 	if (max_count > 0 && expected_count > max_count)
 		expected_count = max_count;

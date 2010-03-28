@@ -26,6 +26,7 @@
 #define _TWITTER_REQUEST_H_
 
 #include <glib.h>
+#include <xmlnode.h>
 
 typedef struct
 {
@@ -103,9 +104,6 @@ struct _TwitterMultiPageRequestData
 };
 
 
-typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(TwitterRequestor *r, GList *nodes, gpointer user_data);
-typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data);
-
 gpointer twitter_requestor_send(TwitterRequestor *r,
 		gboolean post,
 		const char *url,
@@ -128,11 +126,19 @@ void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
 		gpointer data);
 
+/* How did I let these names get so massive */
+typedef void (*TwitterSendRequestMultiPageAllSuccessFunc)(TwitterRequestor *r, GList *nodes, gpointer user_data);
+typedef gboolean (*TwitterSendRequestMultiPageAllErrorFunc)(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data);
+typedef GList *(*TwitterSendRequestMultiPageAllParseFunc)(xmlnode *node);
+typedef	void (*TwitterSendRequestMultiPageAllFreeFunc)(GList *results);
+
 //don't include count in the query_string
 void twitter_send_xml_request_multipage_all(TwitterRequestor *r,
 		const char *url, TwitterRequestParams *params,
 		TwitterSendRequestMultiPageAllSuccessFunc success_callback,
 		TwitterSendRequestMultiPageAllErrorFunc error_callback,
+		TwitterSendRequestMultiPageAllParseFunc parse_results,
+		TwitterSendRequestMultiPageAllFreeFunc free_results,
 		int expected_count, gint max_count, gpointer data);
 
 /* statuses/friends API deprecated page based retrieval,
