@@ -189,6 +189,8 @@ static void twitter_api_get_all_since(TwitterRequestor *r,
 		long long since_id,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
 		TwitterSendRequestMultiPageAllErrorFunc error_func,
+		TwitterSendRequestMultiPageAllParseFunc parse_results,
+		TwitterSendRequestMultiPageAllFreeFunc free_results,
 		gint count_per_page,
 		gint max_count,
 		gpointer data)
@@ -202,6 +204,7 @@ static void twitter_api_get_all_since(TwitterRequestor *r,
 	twitter_send_xml_request_multipage_all(r,
 			url, params,
 			success_func, error_func,
+			parse_results, free_results,
 			count_per_page, max_count, data);
 	twitter_request_params_free(params);
 }
@@ -217,6 +220,8 @@ void twitter_api_get_home_timeline_all(TwitterRequestor *r,
 			since_id,
 			success_func,
 			error_func,
+			twitter_statuses_node_parse,
+			NULL, //TODO
 			TWITTER_HOME_TIMELINE_PAGE_COUNT,
 			max_count,
 			data);
@@ -251,6 +256,8 @@ void twitter_api_get_replies_all(TwitterRequestor *r,
 			since_id,
 			success_func,
 			error_func,
+			NULL,
+			NULL,
 			TWITTER_EVERY_REPLIES_COUNT,
 			max_count,
 			data);
@@ -286,6 +293,8 @@ void twitter_api_get_dms_all(TwitterRequestor *r,
 			since_id,
 			success_func,
 			error_func,
+			NULL,
+			NULL,
 			TWITTER_EVERY_DMS_COUNT,
 			max_count,
 			data);
