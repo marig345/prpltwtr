@@ -128,7 +128,9 @@ void twitter_api_get_rate_limit_status(TwitterRequestor *r,
 {
 	twitter_send_xml_request(r, FALSE,
 			twitter_option_url_get_rate_limit_status(r->account), NULL,
-			success_func, error_func, data);
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+			NULL, NULL,
+			data);
 }
 void twitter_api_get_friends(TwitterRequestor *r,
 		TwitterSendRequestMultiPageAllSuccessFunc success_func,
@@ -163,7 +165,9 @@ static void twitter_api_send_request_single(TwitterRequestor *r,
 
 	twitter_send_xml_request(r, FALSE,
 			url, params,
-			success_func, error_func, data);
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+			NULL, NULL,
+			data);
 
 	twitter_request_params_free(params);
 }
@@ -318,7 +322,9 @@ void twitter_api_set_status(TwitterRequestor *r,
 		twitter_request_params_add(params, twitter_request_param_new_ll("in_reply_to_status_id", in_reply_to_status_id));
 	twitter_send_xml_request(r, TRUE,
 			twitter_option_url_update_status(r->account), params,
-			success_func, error_func, data);
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+			NULL, NULL,
+			data);
 	twitter_request_params_free(params);
 }
 
@@ -425,7 +431,9 @@ void twitter_api_send_dm(TwitterRequestor *r,
 	twitter_request_params_add(params, twitter_request_param_new("user", user));
 	twitter_send_xml_request(r, TRUE,
 			twitter_option_url_new_dm(r->account), params,
-			success_func, error_func, data);
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+			NULL, NULL,
+			data);
 	twitter_request_params_free(params);
 
 }
@@ -440,7 +448,9 @@ void twitter_api_send_rt(TwitterRequestor *r,
 
 	twitter_send_xml_request(r, TRUE,
 			twitter_option_url_rt(r->account, id), NULL,
-			success_func, error_func, data);
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+			NULL, NULL,
+			data);
 
 }
 
@@ -454,7 +464,9 @@ void twitter_api_delete_status(TwitterRequestor *r,
 
 	twitter_send_xml_request(r, TRUE,
 			twitter_option_url_delete_status(r->account, id), NULL,
-			success_func, error_func, data);
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+			NULL, NULL,
+			data);
 
 }
 
@@ -552,7 +564,9 @@ void twitter_api_get_saved_searches(TwitterRequestor *r,
 	{
 		twitter_send_xml_request(r, FALSE,
 				url, NULL,
-				success_func, error_func, data);
+				(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
+				NULL, NULL,
+				data);
 	}
 }
 
@@ -640,7 +654,9 @@ void twitter_api_verify_credentials(TwitterRequestor *r,
 			FALSE,
 			twitter_option_url_verify_credentials(r->account),
 			NULL,
-			success_cb,
+			(TwitterSendXmlRequestParsedSuccessFunc) success_cb,
 			error_cb,
+			NULL,
+			NULL,
 			user_data);
 }

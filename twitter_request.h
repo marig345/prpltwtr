@@ -69,7 +69,10 @@ typedef struct
 typedef void (*TwitterSendRequestSuccessFunc)(TwitterRequestor *r, const gchar *response, gpointer user_data);
 
 typedef void (*TwitterSendXmlRequestSuccessFunc)(TwitterRequestor *r, xmlnode *node, gpointer user_data);
+typedef void (*TwitterSendXmlRequestParsedSuccessFunc)(TwitterRequestor *r, gpointer results, gpointer user_data);
 typedef void (*TwitterSendRequestErrorFunc)(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data);
+typedef gpointer (*TwitterSendXmlRequestParseFunc)(xmlnode *node);
+typedef void (*TwitterSendXmlRequestFreeFunc)(gpointer results);
 
 struct _TwitterRequestor
 {
@@ -123,7 +126,8 @@ void twitter_send_request(TwitterRequestor *r,
 
 void twitter_send_xml_request(TwitterRequestor *r, gboolean post,
 		const char *url, TwitterRequestParams *params,
-		TwitterSendXmlRequestSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		TwitterSendXmlRequestParsedSuccessFunc success_callback, TwitterSendRequestErrorFunc error_callback,
+		TwitterSendXmlRequestParseFunc parse_result, TwitterSendXmlRequestFreeFunc free_result,
 		gpointer data);
 
 /* How did I let these names get so massive */
