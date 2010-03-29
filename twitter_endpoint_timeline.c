@@ -77,11 +77,10 @@ static void twitter_get_home_timeline_parse_statuses(TwitterEndpointChat *endpoi
 	twitter_chat_got_user_tweets(endpoint_chat, statuses);
 }
 
-static void twitter_get_home_timeline_cb(TwitterRequestor *r, xmlnode *node, gpointer user_data)
+static void twitter_get_home_timeline_cb(TwitterRequestor *r, GList *results, gpointer user_data)
 {
 	TwitterEndpointChatId *chat_id = (TwitterEndpointChatId *)user_data;
 	TwitterEndpointChat *endpoint_chat;
-	GList *statuses;
 
 	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
 
@@ -92,8 +91,7 @@ static void twitter_get_home_timeline_cb(TwitterRequestor *r, xmlnode *node, gpo
 	if (endpoint_chat == NULL)
 		return;
 
-	statuses = twitter_statuses_node_parse(node);
-	twitter_get_home_timeline_parse_statuses(endpoint_chat, statuses);
+	twitter_get_home_timeline_parse_statuses(endpoint_chat, results);
 
 }
 

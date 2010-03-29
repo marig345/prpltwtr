@@ -43,7 +43,7 @@ void twitter_api_get_home_timeline(TwitterRequestor *r,
 		long long since_id,
 		int count,
 		int page,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, GList *results, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data);
 
