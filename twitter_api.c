@@ -151,8 +151,10 @@ static void twitter_api_send_request_single(TwitterRequestor *r,
 	long long since_id,
 	int count,
 	int page,
-	TwitterSendXmlRequestSuccessFunc success_func,
+	TwitterSendXmlRequestParsedSuccessFunc success_func,
 	TwitterSendRequestErrorFunc error_func,
+	TwitterSendXmlRequestParseFunc parse_result,
+	TwitterSendXmlRequestFreeFunc free_result,
 	gpointer data)
 {
 	TwitterRequestParams *params = twitter_request_params_new();
@@ -165,8 +167,8 @@ static void twitter_api_send_request_single(TwitterRequestor *r,
 
 	twitter_send_xml_request(r, FALSE,
 			url, params,
-			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
-			NULL, NULL,
+			success_func, error_func,
+			parse_result, free_result,
 			data);
 
 	twitter_request_params_free(params);
@@ -176,7 +178,7 @@ void twitter_api_get_home_timeline(TwitterRequestor *r,
 		long long since_id,
 		int count,
 		int page,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, GList *results, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
@@ -185,8 +187,9 @@ void twitter_api_get_home_timeline(TwitterRequestor *r,
 		since_id,
 		count,
 		page,
-		success_func,
+		(TwitterSendXmlRequestParsedSuccessFunc) success_func,
 		error_func,
+		(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse, NULL,
 		data);
 }
 
@@ -245,8 +248,9 @@ void twitter_api_get_replies(TwitterRequestor *r,
 		since_id,
 		count,
 		page,
-		success_func,
+		(TwitterSendXmlRequestParsedSuccessFunc) success_func,
 		error_func,
+		NULL, NULL,
 		data);
 }
 
@@ -282,8 +286,9 @@ void twitter_api_get_dms(TwitterRequestor *r,
 			since_id,
 			count,
 			page,
-			success_func,
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func,
 			error_func,
+			NULL, NULL,
 			data);
 }
 
