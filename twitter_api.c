@@ -190,7 +190,7 @@ void twitter_api_get_home_timeline(TwitterRequestor *r,
 			(TwitterSendXmlRequestParsedSuccessFunc) success_func,
 			error_func,
 			(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse,
-			NULL, //TODO
+			(TwitterSendXmlRequestFreeFunc) twitter_user_tweets_free,
 			data);
 }
 
@@ -231,7 +231,7 @@ void twitter_api_get_home_timeline_all(TwitterRequestor *r,
 			success_func,
 			error_func,
 			twitter_statuses_node_parse,
-			NULL, //TODO
+			twitter_user_tweets_free,
 			TWITTER_HOME_TIMELINE_PAGE_COUNT,
 			max_count,
 			data);
