@@ -1,7 +1,7 @@
 #include "twitter_endpoint_dm.h"
 #include "twitter_util.h"
 
-static void twitter_send_dm_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
+static void twitter_send_dm_success_cb(PurpleAccount *account, TwitterUserTweet *user_tweet, gboolean last, gpointer _who)
 {
 	if (last && _who)
 		g_free(_who);

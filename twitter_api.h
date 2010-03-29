@@ -24,7 +24,7 @@
 #include "twitter_prefs.h"
 #include "twitter_search.h"
 
-typedef void (*TwitterApiMultiStatusSuccessFunc)(PurpleAccount *account, xmlnode *node, gboolean last_page, gpointer user_data);
+typedef void (*TwitterApiMultiStatusSuccessFunc)(PurpleAccount *account, TwitterUserTweet *user_tweet, gboolean last_page, gpointer user_data);
 typedef gboolean (*TwitterApiMultiStatusErrorFunc)(PurpleAccount *account, const TwitterRequestErrorData *error_data, gpointer user_data);
 
 void twitter_api_get_friends(TwitterRequestor *r,
@@ -85,7 +85,7 @@ void twitter_api_get_rate_limit_status(TwitterRequestor *r,
 void twitter_api_send_dm(TwitterRequestor *r,
 		const char *user,
 		const char *msg,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, TwitterUserTweet *result, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data);
 
@@ -118,7 +118,7 @@ void twitter_api_send_dms(TwitterRequestor *r,
 void twitter_api_set_status(TwitterRequestor *r,
 		const char *msg,
 		long long in_reply_to_status_id,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, TwitterUserTweet *result, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data);
 

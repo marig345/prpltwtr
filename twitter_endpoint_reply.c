@@ -1,8 +1,9 @@
 #include "twitter_endpoint_reply.h"
 #include "twitter_util.h"
 
-static void twitter_send_reply_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _who)
+static void twitter_send_reply_success_cb(PurpleAccount *account, TwitterUserTweet *user_tweet, gboolean last, gpointer _who)
 {
+	//TODO: we should check that the user_tweet text matched the text we expected
 	if (last && _who)
 		g_free(_who);
 }
