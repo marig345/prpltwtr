@@ -475,10 +475,9 @@ TwitterEndpointChat *twitter_endpoint_chat_find(PurpleAccount *account, const ch
 	return (TwitterEndpointChat *) g_hash_table_lookup(twitter->chat_contexts, purple_normalize(account, chat_name));
 }
 
-static void twitter_endpoint_chat_send_success_cb(PurpleAccount *account, xmlnode *node, gboolean last, gpointer _ctx_id)
+static void twitter_endpoint_chat_send_success_cb(PurpleAccount *account, TwitterUserTweet *user_tweet, gboolean last, gpointer _ctx_id)
 {
 	TwitterEndpointChatId *id = _ctx_id;
-	TwitterUserTweet *user_tweet = twitter_update_status_node_parse(node);
 	TwitterTweet *tweet = user_tweet ? user_tweet->status : NULL;
 	TwitterEndpointChat *ctx = twitter_endpoint_chat_find_by_id(id);
 
@@ -499,9 +498,6 @@ static void twitter_endpoint_chat_send_success_cb(PurpleAccount *account, xmlnod
 #endif
 	if (tweet && tweet->id)
 		twitter_add_sent_tweet_id(ctx, tweet->id);
-
-	if (user_tweet)
-		twitter_user_tweet_free(user_tweet);
 
 	if (last)
 		twitter_endpoint_chat_id_free(id);

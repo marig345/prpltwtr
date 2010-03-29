@@ -274,6 +274,23 @@ TwitterTweet *twitter_status_node_parse(xmlnode *status_node)
 
 }
 
+/* Actually, this also gives us info on the recipient, but we don't need it, yet */
+TwitterUserTweet *twitter_send_dm_node_parse(xmlnode *send_dm_node)
+{
+	TwitterTweet *tweet = twitter_status_node_parse(send_dm_node);
+	TwitterUserData *user;
+	if (!tweet)
+		return NULL;
+	user = twitter_user_node_parse(xmlnode_get_child(send_dm_node, "sender"));
+	if (!user)
+	{
+		twitter_status_data_free(tweet);
+		return NULL;
+	}
+	return twitter_user_tweet_new(user->screen_name, user->profile_image_url, user, tweet);
+}
+
+
 TwitterUserTweet *twitter_update_status_node_parse(xmlnode *update_status_node)
 {
 	TwitterTweet *tweet = twitter_status_node_parse(update_status_node);

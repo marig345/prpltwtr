@@ -317,7 +317,7 @@ void twitter_api_get_dms_all(TwitterRequestor *r,
 void twitter_api_set_status(TwitterRequestor *r,
 		const char *msg,
 		long long in_reply_to_status_id,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, TwitterUserTweet *result, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
@@ -331,7 +331,8 @@ void twitter_api_set_status(TwitterRequestor *r,
 	twitter_send_xml_request(r, TRUE,
 			twitter_option_url_update_status(r->account), params,
 			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
-			NULL, NULL,
+			(TwitterSendXmlRequestParseFunc) twitter_update_status_node_parse,
+			(TwitterSendXmlRequestFreeFunc) twitter_user_tweet_free,
 			data);
 	twitter_request_params_free(params);
 }
@@ -351,7 +352,7 @@ typedef struct
 	gchar *dm_who;
 } TwitterMultiMessageContext;
 
-static void twitter_api_set_statuses_success_cb(TwitterRequestor *r, xmlnode *node, gpointer _ctx);
+static void twitter_api_set_statuses_success_cb(TwitterRequestor *r, TwitterUserTweet *result, gpointer _ctx);
 static void twitter_api_set_statuses_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer _ctx)
 {
 	TwitterMultiMessageContext *ctx = _ctx;
@@ -372,7 +373,7 @@ static void twitter_api_set_statuses_error_cb(TwitterRequestor *r, const Twitter
 			ctx);
 }
 
-static void twitter_api_set_statuses_success_cb(TwitterRequestor *r, xmlnode *node, gpointer _ctx)
+static void twitter_api_set_statuses_success_cb(TwitterRequestor *r, TwitterUserTweet *result, gpointer _ctx)
 {
 	TwitterMultiMessageContext *ctx = _ctx;
 	gboolean last = FALSE;
@@ -386,7 +387,7 @@ static void twitter_api_set_statuses_success_cb(TwitterRequestor *r, xmlnode *no
 	}
 
 	if (ctx->success_func)
-		ctx->success_func(r->account, node, last, ctx->user_data);
+		ctx->success_func(r->account, result, last, ctx->user_data);
 
 	if (last)
 		return;
@@ -427,7 +428,7 @@ void twitter_api_set_statuses(TwitterRequestor *r,
 void twitter_api_send_dm(TwitterRequestor *r,
 		const char *user,
 		const char *msg,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, TwitterUserTweet *result, gpointer user_data), //TODO: name this
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
@@ -440,7 +441,8 @@ void twitter_api_send_dm(TwitterRequestor *r,
 	twitter_send_xml_request(r, TRUE,
 			twitter_option_url_new_dm(r->account), params,
 			(TwitterSendXmlRequestParsedSuccessFunc) success_func, error_func,
-			NULL, NULL,
+			(TwitterSendXmlRequestParseFunc) twitter_send_dm_node_parse,
+			(TwitterSendXmlRequestFreeFunc) twitter_user_tweet_free,
 			data);
 	twitter_request_params_free(params);
 
@@ -478,7 +480,7 @@ void twitter_api_delete_status(TwitterRequestor *r,
 
 }
 
-static void twitter_api_send_dms_success_cb(TwitterRequestor *r, xmlnode *node, gpointer _ctx);
+static void twitter_api_send_dms_success_cb(TwitterRequestor *r, TwitterUserTweet *result, gpointer _ctx);
 static void twitter_api_send_dms_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer _ctx)
 {
 	TwitterMultiMessageContext *ctx = _ctx;
@@ -502,7 +504,7 @@ static void twitter_api_send_dms_error_cb(TwitterRequestor *r, const TwitterRequ
 			ctx);
 }
 
-static void twitter_api_send_dms_success_cb(TwitterRequestor *r, xmlnode *node, gpointer _ctx)
+static void twitter_api_send_dms_success_cb(TwitterRequestor *r, TwitterUserTweet *result, gpointer _ctx)
 {
 	TwitterMultiMessageContext *ctx = _ctx;
 	gboolean last = FALSE;
@@ -519,7 +521,7 @@ static void twitter_api_send_dms_success_cb(TwitterRequestor *r, xmlnode *node, 
 	}
 
 	if (ctx->success_func)
-		ctx->success_func(r->account, node, last, ctx->user_data);
+		ctx->success_func(r->account, result, last, ctx->user_data);
 
 	if (last)
 		return;
