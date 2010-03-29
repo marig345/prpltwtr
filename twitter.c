@@ -965,10 +965,9 @@ static void twitter_oauth_request_token_error_cb(TwitterRequestor *r, const Twit
 	twitter_oauth_disconnect(r->account, "Error receiving request token");
 }
 
-void twitter_verify_credentials_success_cb(TwitterRequestor *r, xmlnode *node, gpointer user_data)
+void twitter_verify_credentials_success_cb(TwitterRequestor *r, TwitterUserTweet *user_tweet, gpointer user_data)
 {
 	PurpleAccount *account = r->account;
-	TwitterUserTweet *user_tweet = twitter_verify_credentials_parse(node);
 	if (!user_tweet || !user_tweet->screen_name)
 	{
 		twitter_oauth_disconnect(account, "Could not verify credentials");
@@ -979,7 +978,6 @@ void twitter_verify_credentials_success_cb(TwitterRequestor *r, xmlnode *node, g
 	{
 		twitter_verify_connection(account);
 	}
-	twitter_user_tweet_free(user_tweet);
 }
 
 static void twitter_verify_credentials_error_cb(TwitterRequestor *r, const TwitterRequestErrorData *error_data, gpointer user_data)

@@ -654,7 +654,7 @@ void twitter_api_oauth_access_token(TwitterRequestor *r,
 }
 
 void twitter_api_verify_credentials(TwitterRequestor *r,
-		TwitterSendXmlRequestSuccessFunc success_cb,
+		void (*success_cb)(TwitterRequestor *r, TwitterUserTweet *results, gpointer user_data),
 		TwitterSendRequestErrorFunc error_cb,
 		gpointer user_data)
 {
@@ -664,7 +664,7 @@ void twitter_api_verify_credentials(TwitterRequestor *r,
 			NULL,
 			(TwitterSendXmlRequestParsedSuccessFunc) success_cb,
 			error_cb,
-			NULL,
-			NULL,
+			(TwitterSendXmlRequestParseFunc) twitter_verify_credentials_parse,
+			(TwitterSendXmlRequestFreeFunc) twitter_user_tweet_free,
 			user_data);
 }

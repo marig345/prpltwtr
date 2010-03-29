@@ -145,7 +145,7 @@ void twitter_api_search_refresh(TwitterRequestor *r,
         gpointer data);
 
 void twitter_api_verify_credentials(TwitterRequestor *r,
-		TwitterSendXmlRequestSuccessFunc success_cb,
+		void (*success_cb)(TwitterRequestor *r, TwitterUserTweet *results, gpointer user_data),
 		TwitterSendRequestErrorFunc error_cb,
 		gpointer user_data);
 
