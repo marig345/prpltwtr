@@ -183,14 +183,15 @@ void twitter_api_get_home_timeline(TwitterRequestor *r,
 		gpointer data)
 {
 	twitter_api_send_request_single(r,
-		twitter_option_url_get_home_timeline(r->account),
-		since_id,
-		count,
-		page,
-		(TwitterSendXmlRequestParsedSuccessFunc) success_func,
-		error_func,
-		(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse, NULL,
-		data);
+			twitter_option_url_get_home_timeline(r->account),
+			since_id,
+			count,
+			page,
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func,
+			error_func,
+			(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse,
+			NULL, //TODO
+			data);
 }
 
 static void twitter_api_get_all_since(TwitterRequestor *r,
@@ -244,15 +245,15 @@ void twitter_api_get_replies(TwitterRequestor *r,
 		gpointer data)
 {
 	twitter_api_send_request_single(r,
-		twitter_option_url_get_mentions(r->account),
-		since_id,
-		count,
-		page,
-		(TwitterSendXmlRequestParsedSuccessFunc) success_func,
-		error_func,
-		(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse,
-		(TwitterSendXmlRequestFreeFunc) twitter_user_tweets_free,
-		data);
+			twitter_option_url_get_mentions(r->account),
+			since_id,
+			count,
+			page,
+			(TwitterSendXmlRequestParsedSuccessFunc) success_func,
+			error_func,
+			(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse,
+			(TwitterSendXmlRequestFreeFunc) twitter_user_tweets_free,
+			data);
 }
 
 void twitter_api_get_replies_all(TwitterRequestor *r,
@@ -278,7 +279,7 @@ void twitter_api_get_dms(TwitterRequestor *r,
 		long long since_id,
 		int count,
 		int page,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, GList *results, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
@@ -289,7 +290,8 @@ void twitter_api_get_dms(TwitterRequestor *r,
 			page,
 			(TwitterSendXmlRequestParsedSuccessFunc) success_func,
 			error_func,
-			NULL, NULL,
+			(TwitterSendXmlRequestParseFunc) twitter_dms_node_parse,
+			(TwitterSendXmlRequestFreeFunc) twitter_user_tweets_free,
 			data);
 }
 

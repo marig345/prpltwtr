@@ -84,21 +84,16 @@ static gboolean twitter_get_dms_all_timeout_error_cb(TwitterRequestor *r,
 	return TRUE; //restart timer and try again
 }
 
-static void twitter_get_dms_get_last_since_id_success_cb(TwitterRequestor *requestor, xmlnode *node, gpointer user_data)
+static void twitter_get_dms_get_last_since_id_success_cb(TwitterRequestor *requestor, GList *user_tweets, gpointer user_data)
 {
 	TwitterLastSinceIdRequest *r = user_data;
 	long long id = 0;
-	xmlnode *status_node = xmlnode_get_child(node, "direct_message");
-	purple_debug_info(TWITTER_PROTOCOL_ID, "%s\n", G_STRFUNC);
-	if (status_node != NULL)
-	{
-		TwitterTweet *status_data = twitter_dm_node_parse(status_node);
-		if (status_data != NULL)
-		{
-			id = status_data->id;
 
-			twitter_status_data_free(status_data);
-		}
+	if (user_tweets && user_tweets->data)
+	{
+		TwitterUserTweet *user_tweet = user_tweets->data;
+		if (user_tweet && user_tweet->status)
+			id = user_tweet->status->id;
 	}
 	r->success_cb(requestor->account, id, r->user_data);
 	g_free(r);
