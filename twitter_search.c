@@ -52,8 +52,6 @@ static void twitter_send_search_success_cb(TwitterRequestor *r, gpointer _result
 	ctx->success_func(r->account, results->tweets,
 			results->refresh_url, results->max_id, ctx->user_data);
 
-	results->tweets = NULL;
-
 	g_slice_free (TwitterSearchContext, ctx);
 }
 

@@ -355,11 +355,8 @@ void twitter_chat_got_user_tweets(TwitterEndpointChat *endpoint_chat, GList *use
 
 		status = twitter_user_tweet_take_tweet(user_tweet);
 		twitter_buddy_set_status_data(account, user_tweet->screen_name, status);
-
-		twitter_user_tweet_free(user_tweet);
 	}
 	twitter_sent_tweets_ids_remove_before(endpoint_chat, max_id);
-	g_list_free(user_tweets);
 }
 
 static int _tweet_id_compare(long long *a, long long *b)
