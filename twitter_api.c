@@ -239,7 +239,7 @@ void twitter_api_get_replies(TwitterRequestor *r,
 		long long since_id,
 		int count,
 		int page,
-		TwitterSendXmlRequestSuccessFunc success_func,
+		void (*success_func)(TwitterRequestor *r, GList *results, gpointer user_data),
 		TwitterSendRequestErrorFunc error_func,
 		gpointer data)
 {
@@ -250,7 +250,8 @@ void twitter_api_get_replies(TwitterRequestor *r,
 		page,
 		(TwitterSendXmlRequestParsedSuccessFunc) success_func,
 		error_func,
-		NULL, NULL,
+		(TwitterSendXmlRequestParseFunc) twitter_statuses_node_parse,
+		(TwitterSendXmlRequestFreeFunc) twitter_user_tweets_free,
 		data);
 }
 
